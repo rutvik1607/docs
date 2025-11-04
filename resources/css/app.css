@@ -250,7 +250,8 @@ body {
   color: #5f6368;
 }
 
-.add-page-btn, .more-btn {
+.add-page-btn,
+.more-btn {
   background: none;
   border: none;
   padding: 8px;
@@ -259,7 +260,8 @@ body {
   color: #5f6368;
 }
 
-.add-page-btn:hover, .more-btn:hover {
+.add-page-btn:hover,
+.more-btn:hover {
   background-color: #f1f3f4;
 }
 
@@ -269,7 +271,7 @@ body {
   padding: 24px;
   display: flex;
   justify-content: center;
-  background: #f8f9fa;
+  background: #eaeaea;
   overflow-y: auto;
 }
 
@@ -596,39 +598,39 @@ body {
     max-width: 768px;
     margin: 0 auto;
   }
-  
+
   .main-content {
     flex-direction: column;
   }
-  
+
   .right-sidebar {
     width: 100%;
     border-left: none;
     border-top: 1px solid #e8eaed;
   }
-  
+
   .document-canvas {
     padding: 16px;
   }
-  
+
   .document-page {
     width: 100%;
     min-height: 400px;
   }
-  
+
   .page-content {
     padding: 48px 24px;
   }
-  
+
   .header-right {
     gap: 4px;
   }
-  
+
   .subscription-btn,
   .help-btn {
     display: none;
   }
-  
+
   .template-item {
     width: 80px;
     height: 100px;
@@ -639,25 +641,84 @@ body {
   .document-title {
     font-size: 16px;
   }
-  
+
   .document-meta {
     flex-wrap: wrap;
   }
-  
+
   .field-row {
     flex-direction: column;
   }
-  
+
   .block-row {
     flex-direction: column;
   }
-  
+
   .templates-container {
     gap: 8px;
   }
-  
+
   .template-item {
     width: 60px;
     height: 80px;
+  }
+}
+
+.floating-download-btn {
+  position: fixed;
+  bottom: 30px;
+  left: 30px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: none;
+  background: #1861ff;
+  box-shadow: 0 8px 24px rgba(28, 24, 255, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  z-index: 9999;
+  animation: pulse 2.5s infinite;
+}
+
+/* .floating-download-btn::before {
+  content: "";
+  position: absolute;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: radial-gradient(rgba(255, 122, 24, 0.15),
+      rgba(255, 122, 24, 0));
+  z-index: -1;
+} */
+
+.floating-download-btn:hover {
+  transform: translateY(-3px) scale(1.05);
+  box-shadow: 0 10px 30px rgba(24, 86, 255, 0.4);
+}
+
+.floating-download-btn svg {
+  width: 40px;
+  height: 40px;
+  fill: #fff;
+}
+
+/* 💡 Pulse animation keyframes */
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(24, 151, 255, 0.4);
+  }
+
+  70% {
+    transform: scale(1.05);
+    box-shadow: 0 0 0 15px rgba(24, 97, 255, 0);
+  }
+
+  100% {
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(24, 39, 255, 0);
   }
 }
