@@ -107,7 +107,7 @@ const App = () => {
             });
 
             const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
 
             const formData = new FormData();
             formData.append("file", blob, fileName.replace(".pdf", "_filled.pdf"));
@@ -149,7 +149,7 @@ const App = () => {
             });
 
             const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
             const downloadUrl = URL.createObjectURL(blob);
 
             const a = document.createElement("a");
