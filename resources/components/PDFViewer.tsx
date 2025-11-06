@@ -104,19 +104,25 @@ export default function PdfViewer({
                             }}
                             onDrop={(e) => {
                                 e.preventDefault();
-                                // handle drop into this page
+                                // handle drop into this page only for our sidebar field payloads
                                 try {
-                                    const data = e.dataTransfer?.getData('application/json');
-                                    const payload = data ? JSON.parse(data) : null;
+                                    const raw = e.dataTransfer?.getData('application/json');
+                                    if (!raw) return; // ignore drops without our payload
+
+                                    const payload = JSON.parse(raw);
+                                    // Only accept drops that came from our RightSidebar (marked with type: 'field')
+                                    if (!payload || payload.type !== 'field') return;
+
                                     const pageElem = e.currentTarget as HTMLDivElement;
                                     const rect = pageElem.getBoundingClientRect();
                                     const original = pageDims[pageNumber - 1];
                                     const scale = original ? rect.width / original.width : 1;
                                     const x = (e.clientX - rect.left) / scale;
                                     const y = (e.clientY - rect.top) / scale;
+
                                     const id = (typeof crypto !== 'undefined' && (crypto as any).randomUUID) ? (crypto as any).randomUUID() : `tb_${Date.now()}`;
-                                    const content = payload?.label ?? payload?.type ?? 'Text field';
-                                    const fieldType = payload?.fieldType ?? 'text';
+                                    const content = payload.label ?? 'Text field';
+                                    const fieldType = payload.fieldType ?? 'text';
                                     addTextBox({ id, page: pageNumber, x, y, content, fieldType });
                                 } catch (err) {
                                     console.error('Drop parse error', err);

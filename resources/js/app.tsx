@@ -81,6 +81,19 @@ const App = () => {
         }
     };
 
+    const wrapForSave = (content: string) => {
+        const raw = content == null ? "" : String(content);
+        const unwrapped = raw.replace(/^\s*\{\{\s*/, "").replace(/\s*\}\}\s*$/, "");
+        const ascii = unwrapped.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+        let slug = ascii
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "-")
+            .replace(/-+/g, "-")
+            .replace(/^-+|-+$/g, "");
+        if (!slug) return "{{ }}";
+        return `{{ ${slug} }}`;
+    };
+
     const handleSaveToServer = async () => {
         if (!pdfFile) {
             toast.warning("Please upload a PDF before saving.");
@@ -97,7 +110,7 @@ const App = () => {
             textBoxes.forEach((tb) => {
                 const page = pdfDoc.getPage(tb.page - 1);
                 const { height } = page.getSize();
-                page.drawText(tb.content, {
+                page.drawText(wrapForSave(tb.content), {
                     x: tb.x,
                     y: height - tb.y,
                     size: 12,
@@ -120,48 +133,6 @@ const App = () => {
         } catch (error) {
             console.error(error);
             toast.error("Error while saving PDF to server.");
-        }
-    };
-
-    const handleDownload = async () => {
-        if (!pdfFile) {
-            toast.warning("Please upload a PDF before downloading.");
-            return;
-        }
-
-        toast.info("Generating your filled PDF...");
-
-        try {
-            const arrayBuffer = await pdfFile.arrayBuffer();
-            const pdfDoc = await PDFDocument.load(arrayBuffer);
-            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-
-            textBoxes.forEach((tb) => {
-                const page = pdfDoc.getPage(tb.page - 1);
-                const { height } = page.getSize();
-                page.drawText(tb.content, {
-                    x: tb.x,
-                    y: height - tb.y,
-                    size: 12,
-                    font,
-                    color: rgb(0, 0, 0),
-                });
-            });
-
-            const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
-            const downloadUrl = URL.createObjectURL(blob);
-
-            const a = document.createElement("a");
-            a.href = downloadUrl;
-            a.download = fileName.replace(".pdf", "_filled.pdf");
-            a.click();
-
-            URL.revokeObjectURL(downloadUrl);
-            toast.success("PDF downloaded successfully!");
-        } catch (error) {
-            console.error(error);
-            toast.error("Failed to generate PDF. Please try again.");
         }
     };
 

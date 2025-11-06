@@ -575,7 +575,11 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding-left: 16px; /* leave space so text/glyph doesn't overlap handle */
+}
+
+/* Apply extra left padding only on hover so content doesn't overlap the handle */
+.rs-btn:hover .rs-btn-inner {
+  padding-left: 16px;
 }
 
 .rs-glyph {
