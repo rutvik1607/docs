@@ -207,14 +207,19 @@ export default function PdfViewer({
 
                                         // Render field based on its type
                                         const commonStyle: React.CSSProperties = {
+                                            borderRadius: '2px',
+                                            display: 'block',
+                                            fontFamily: 'sans-serif',
+                                            fontSize: '14px',
+                                            height: '100%',
                                             minWidth: 80,
                                             maxWidth: 300,
                                             padding: 4,
-                                            border: tb.id === selectedTextBoxId ? '2px solid #2563eb' : '1px solid rgba(0,0,0,0.2)',
-                                            background: 'rgba(255,255,255,0.9)',
+                                            border: tb.id === selectedTextBoxId ? '2px solid #49806e' : '1px solid #49806e',
                                             touchAction: 'none',
-                                            display: 'flex',
                                             alignItems: 'center',
+                                            backgroundColor: '#e8f2ef', 
+                                            zIndex: 10
                                         };
 
                                         const renderField = () => {
@@ -222,13 +227,13 @@ export default function PdfViewer({
                                                 case 'signature':
                                                     return (
                                                         <div
-                                                            style={{ ...commonStyle, width: 180, height: 60, justifyContent: 'center' }}
+                                                            style={{ ...commonStyle, width: 180, height: 60, justifyContent: 'center', background: '#e8f2ef !important', }}
                                                             onPointerDown={onPointerDown}
                                                             onDoubleClick={(e) => e.stopPropagation()}
                                                         >
-                                                            <div style={{ textAlign: 'center', width: '100%' }}>
-                                                                <div style={{ fontSize: 12, color: '#6b7280' }}>Signature</div>
-                                                                <div style={{ marginTop: 6, height: 24, borderBottom: '1px dashed #9ca3af' }} />
+                                                            <div style={{ textAlign: 'center', justifyContent:'center', width: '100%', display:'flex', alignItems:'center', padding:'8px',  gap:'0', fontWeight:'bold' }}>
+                                                                <svg  style={{ width: '24px', height: '24px', fill:'rgb(36, 133, 103)', flexShrink:0, overflow:'hidden', display:'block' }} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-testid="icon" data-sentry-element="SvgIconComponent" data-sentry-component="SignaturePlaceholderIconComponent" data-sentry-source-file="signature_placeholder_icon.tsx" role="presentation"><path d="M8 6.95L12.95 2l1.06 1.06-4.95 4.95L8 6.95zm11.36-1.47l-2.83-2.83L6.17 13.01l-1.44 4.27L9 15.84 19.36 5.48zM3 21.01h18v-2H3v2z"></path></svg>
+                                                                Signature
                                                             </div>
                                                         </div>
                                                     );
@@ -239,7 +244,7 @@ export default function PdfViewer({
                                                             value={tb.content}
                                                             onChange={(e) => updateTextBox(tb.id, e.target.value)}
                                                             onPointerDown={onPointerDown}
-                                                            style={{ ...commonStyle, width: 160 }}
+                                                            style={{ ...commonStyle, width: 160, textAlign: 'center' }}
                                                         />
                                                     );
                                                 case 'initials':
@@ -250,7 +255,7 @@ export default function PdfViewer({
                                                             maxLength={5}
                                                             onChange={(e) => updateTextBox(tb.id, e.target.value)}
                                                             onPointerDown={onPointerDown}
-                                                            style={{ ...commonStyle, width: 80 }}
+                                                            style={{ ...commonStyle, width: '100px', height: '68px', top: '215px', left: '240.5px', touchAction: 'none', pointerEvents: 'inherit' }}
                                                         />
                                                     );
                                                 case 'billing':
@@ -259,16 +264,19 @@ export default function PdfViewer({
                                                             value={tb.content}
                                                             onChange={(e) => updateTextBox(tb.id, e.target.value)}
                                                             onPointerDown={onPointerDown}
-                                                            style={{ ...commonStyle, width: 220, height: 80, resize: 'none' }}
+                                                            style={{ ...commonStyle, width: 220, height: 80, resize: 'none', textAlign: 'center' }}
                                                         />
                                                     );
                                                 case 'stamp':
                                                     return (
                                                         <div
-                                                            style={{ ...commonStyle, width: 100, height: 40, justifyContent: 'center' }}
+                                                            style={{ ...commonStyle, display:'flex', alignItems:'center', width: '150px', height: '150px', top: '304px', left: '240.5px', touchAction: 'none', pointerEvents: 'inherit' }}
                                                             onPointerDown={onPointerDown}
                                                         >
-                                                            <div style={{ fontWeight: 'bold' }}>�STAMP�</div>
+                                                            <div style={{ textAlign: 'center', width: '100%', display:'flex', justifyContent:'center', alignItems:'center', padding:'8px',  gap:'0', fontWeight:'bold' }}>
+                                                            <svg style={{ width: '24px', height: '24px', fill:'rgb(36, 133, 103)', flexShrink:0, overflow:'hidden', display:'block' }} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" data-testid="icon" data-sentry-element="SvgIconComponent" data-sentry-component="SignaturePlaceholderIconComponent" data-sentry-source-file="signature_placeholder_icon.tsx" role="presentation"><g clip-path="url(#Stamp_svg__a)"><path fill-rule="evenodd" d="M12 11l1.79-5.483C13.696 4.707 12.977 4 12 4c-.976 0-1.694.701-1.79 1.508zm2 0l1.8-5.308C15.798 3.652 14.097 2 12 2c-1.341 0-2.52.674-3.196 1.692a3.6 3.6 0 00-.605 2h.002L10 11H4v6h16v-6zm7 8H3v2h18z" clip-rule="evenodd"></path></g><defs><clipPath id="Stamp_svg__a"><path d="M0 0h24v24H0z"></path></clipPath></defs></svg>
+                                                            STAMP
+                                                            </div>
                                                         </div>
                                                     );
                                                 default:
@@ -279,7 +287,9 @@ export default function PdfViewer({
                                                             onChange={(e) => updateTextBox(tb.id, e.target.value)}
                                                             onPointerDown={onPointerDown}
                                                             onDoubleClick={(e) => e.stopPropagation()}
-                                                            style={{ ...commonStyle, resize: 'both' }}
+                                                            style={{ ...commonStyle, resize: 'both', height:'30px',width:'167px', }}
+                                                            id="text-box"
+                                                            name="text-box"
                                                         />
                                                     );
                                             }
