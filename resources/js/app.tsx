@@ -44,7 +44,7 @@ const App = () => {
     const removeTextBox = (id: string) => setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
 
-    const wrapForSave = (content: string) => {
+    const wrapForSave = (content: string, fieldType: string | undefined, textBoxIndex: number) => {
         const raw = content == null ? "" : String(content);
         const unwrapped = raw.replace(/^\s*\{\{\s*/, "").replace(/\s*\}\}\s*$/, "");
         const ascii = unwrapped.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -53,8 +53,13 @@ const App = () => {
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/-+/g, "-")
             .replace(/^-+|-+$/g, "");
-        if (!slug) return "{{ }}";
-        return `{{ ${slug} }}`;
+        
+        const typeCount = textBoxes
+            .slice(0, textBoxIndex)
+            .filter((tb) => tb.fieldType === fieldType)
+            .length;
+        
+        return `{{ ${slug}-${typeCount} }}`;
     };
 
     const handleSaveToServer = async () => {
@@ -71,10 +76,10 @@ const App = () => {
             const pdfDoc = await PDFDocument.load(arrayBuffer);
             const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-            textBoxes.forEach((tb) => {
+            textBoxes.forEach((tb, index) => {
                 const page = pdfDoc.getPage(tb.page - 1);
                 const { height } = page.getSize();
-                page.drawText(wrapForSave(tb.content), {
+                page.drawText(wrapForSave(tb.content, tb.fieldType, index), {
                     x: tb.x,
                     y: height - tb.y,
                     size: 12,
@@ -84,7 +89,7 @@ const App = () => {
             });
 
             const pdfBytes = await pdfDoc.save();
-            const blob = new Blob([pdfBytes], { type: "application/pdf" });
+            const blob = new Blob([pdfBytes as BlobPart], { type: "application/pdf" });
             const formData = new FormData();
             formData.append("file", blob, fileName.replace(".pdf", "_filled.pdf"));
 

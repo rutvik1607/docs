@@ -232,29 +232,6 @@ export default function PdfViewer({
                                                             </div>
                                                         </div>
                                                     );
-                                                case 'checkbox':
-                                                    return (
-                                                        <label style={{ ...commonStyle, width: 'auto', gap: 8 }} onPointerDown={onPointerDown}>
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={tb.content === 'checked'}
-                                                                onChange={(e) => updateTextBox(tb.id, e.target.checked ? 'checked' : 'unchecked')}
-                                                            />
-                                                            <span style={{ fontSize: 12 }}>{tb.content || 'Checkbox'}</span>
-                                                        </label>
-                                                    );
-                                                case 'radio':
-                                                    return (
-                                                        <label style={{ ...commonStyle, width: 'auto', gap: 8 }} onPointerDown={onPointerDown}>
-                                                            <input
-                                                                type="radio"
-                                                                name={`radio_${tb.page}`}
-                                                                checked={tb.content === 'selected'}
-                                                                onChange={(e) => updateTextBox(tb.id, 'selected')}
-                                                            />
-                                                            <span style={{ fontSize: 12 }}>{tb.content || 'Option'}</span>
-                                                        </label>
-                                                    );
                                                 case 'date':
                                                     return (
                                                         <input
@@ -275,19 +252,6 @@ export default function PdfViewer({
                                                             onPointerDown={onPointerDown}
                                                             style={{ ...commonStyle, width: 80 }}
                                                         />
-                                                    );
-                                                case 'dropdown':
-                                                    return (
-                                                        <select
-                                                            value={tb.content}
-                                                            onChange={(e) => updateTextBox(tb.id, e.target.value)}
-                                                            onPointerDown={onPointerDown}
-                                                            style={{ ...commonStyle, width: 160 }}
-                                                        >
-                                                            <option value="">Select</option>
-                                                            <option value="option1">Option 1</option>
-                                                            <option value="option2">Option 2</option>
-                                                        </select>
                                                     );
                                                 case 'billing':
                                                     return (
