@@ -26,7 +26,7 @@
         "fabric": "^6.7.1",
         "pandadoc-editor": "^0.0.0-b.10",
         "pdf-lib": "^1.17.1",
-        "pdfjs-dist": "^5.4.296",
+        "pdfjs-dist": "^5.4.394",
         "react": "^19.1.1",
         "react-dom": "^19.1.1",
         "react-pdf": "^10.2.0",

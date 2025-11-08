@@ -10,6 +10,7 @@ import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import { uploadPdf } from "./api/api";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import axios from "axios";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -34,7 +35,18 @@ const App = () => {
 
 
     React.useEffect(() => {
-        const storedPdfUrl = "/storage/upload/testing.pdf"; 
+        // const fetchS3Pdf = async () => {
+        //     try {
+        //         const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
+        //         const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
+        //         setPdfUrl(response.data.url);
+        //     } catch (error) {
+        //         console.error("Error fetching PDF from S3:", error);
+        //     }
+        // };
+
+        // fetchS3Pdf();
+        const storedPdfUrl = "/storage/upload/testing.pdf";
         setPdfUrl(storedPdfUrl);
     }, []);
 
@@ -52,14 +64,15 @@ const App = () => {
             .toLowerCase()
             .replace(/[^a-z0-9]+/g, "-")
             .replace(/-+/g, "-")
-            .replace(/^-+|-+$/g, "");
-        
+            .replace(/^-+|-+$/g, "")
+            .replace(/-/g, "");
+
         const typeCount = textBoxes
             .slice(0, textBoxIndex)
             .filter((tb) => tb.fieldType === fieldType)
             .length;
-        
-        return `{{ ${slug}-${typeCount} }}`;
+
+        return `{{ ${slug}=${typeCount} }}`;
     };
 
     const handleSaveToServer = async () => {
@@ -67,9 +80,6 @@ const App = () => {
             toast.warning("PDF not found.");
             return;
         }
-
-        toast.info("Saving PDF to server...");
-
         try {
             const response = await fetch(pdfUrl);
             const arrayBuffer = await response.arrayBuffer();
@@ -80,8 +90,8 @@ const App = () => {
                 const page = pdfDoc.getPage(tb.page - 1);
                 const { height } = page.getSize();
                 page.drawText(wrapForSave(tb.content, tb.fieldType, index), {
-                    x: tb.x,
-                    y: height - tb.y,
+                    x: tb.x + 34,
+                    y: height - tb.y - 38,
                     size: 12,
                     font,
                     color: rgb(0, 0, 0),
@@ -95,9 +105,7 @@ const App = () => {
 
             const result = await uploadPdf(formData);
 
-            toast.success(`PDF saved successfully!\nPath: ${result.path}`, {
-                style: { whiteSpace: "pre-line" },
-            });
+            toast.success(`PDF saved successfully.`);
         } catch (error) {
             console.error(error);
             toast.error("Error while saving PDF to server.");
