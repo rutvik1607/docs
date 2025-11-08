@@ -35,19 +35,19 @@ const App = () => {
 
 
     React.useEffect(() => {
-        // const fetchS3Pdf = async () => {
-        //     try {
-        //         const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
-        //         const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
-        //         setPdfUrl(response.data.url);
-        //     } catch (error) {
-        //         console.error("Error fetching PDF from S3:", error);
-        //     }
-        // };
+        const fetchS3Pdf = async () => {
+            try {
+                const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
+                const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
+                setPdfUrl(response.data.url);
+            } catch (error) {
+                console.error("Error fetching PDF from S3:", error);
+            }
+        };
 
-        // fetchS3Pdf();
-        const storedPdfUrl = "/storage/upload/testing.pdf";
-        setPdfUrl(storedPdfUrl);
+        fetchS3Pdf();
+        // const storedPdfUrl = "/storage/upload/testing.pdf";
+        // setPdfUrl(storedPdfUrl);
     }, []);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
