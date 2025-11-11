@@ -96,7 +96,7 @@ const RightSidebar = ({ onSave }: RightSidebarProps) => {
       </div>
 
       {/* Download button at the bottom */}
-      {onSave && (
+      {/* {onSave && (
         <div className="rs-download-container">
           <button
             className="rs-download-btn"
@@ -115,7 +115,7 @@ const RightSidebar = ({ onSave }: RightSidebarProps) => {
             Save PDF
           </button>
         </div>
-      )}
+      )} */}
     </aside>
   );
 };

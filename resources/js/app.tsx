@@ -56,7 +56,21 @@ const App = () => {
         // fetchS3Pdf();
         const storedPdfUrl = "/storage/upload/testing.pdf";
         setPdfUrl(storedPdfUrl);
+
+        // Load persisted textBoxes for this PDF
+        const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
+        const savedTextBoxes = localStorage.getItem(storageKey);
+        if (savedTextBoxes) {
+            setTextBoxes(JSON.parse(savedTextBoxes));
+        }
     }, []);
+
+    React.useEffect(() => {
+        if (pdfUrl) {
+            const storageKey = `pdf-textBoxes-${pdfUrl}`;
+            localStorage.setItem(storageKey, JSON.stringify(textBoxes));
+        }
+    }, [textBoxes, pdfUrl]);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
     const updateTextBox = (id: string, content: string) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, content } : tb)));
