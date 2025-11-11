@@ -42,7 +42,11 @@ const fieldButtons: FieldButton[][] = [
   ],
 ];
 
-const RightSidebar = () => {
+interface RightSidebarProps {
+  onSave?: () => void;
+}
+
+const RightSidebar = ({ onSave }: RightSidebarProps) => {
   const handleDragStart = (
     e: DragEvent<HTMLButtonElement>,
     type: string,
@@ -90,6 +94,28 @@ const RightSidebar = () => {
           </div>
         ))}
       </div>
+
+      {/* Download button at the bottom */}
+      {onSave && (
+        <div className="rs-download-container">
+          <button
+            className="rs-download-btn"
+            title="Save PDF"
+            onClick={onSave}
+          >
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              width="24"
+              height="24"
+              viewBox="0 0 24 24"
+              fill="white"
+            >
+              <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-10H6V5h9v2z" />
+            </svg>
+            Save PDF
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

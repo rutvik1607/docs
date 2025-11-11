@@ -40,6 +40,8 @@ const App = () => {
         y: number;
         content: string;
         fieldType?: string;
+        width?: number;
+        height?: number;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -53,6 +55,7 @@ const App = () => {
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
     const updateTextBox = (id: string, content: string) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, content } : tb)));
     const moveTextBox = (id: string, x: number, y: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, x, y } : tb)));
+    const resizeTextBox = (id: string, width: number, height: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, width, height } : tb)));
     const removeTextBox = (id: string) => setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
 
@@ -197,6 +200,7 @@ const App = () => {
                                 moveTextBox={moveTextBox}
                                 addTextBox={addTextBox}
                                 removeTextBox={removeTextBox}
+                                resizeTextBox={resizeTextBox}
                                 setSelectedTextBoxId={setSelectedTextBoxId}
                                 selectedTextBoxId={selectedTextBoxId}
                                 onDocumentLoadSuccess={(pdf) => setNumPages(pdf.numPages)}

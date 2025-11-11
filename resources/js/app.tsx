@@ -26,6 +26,8 @@ const App = () => {
         y: number;
         content: string;
         fieldType?: string;
+        width?: number;
+        height?: number;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -59,6 +61,7 @@ const App = () => {
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
     const updateTextBox = (id: string, content: string) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, content } : tb)));
     const moveTextBox = (id: string, x: number, y: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, x, y } : tb)));
+    const resizeTextBox = (id: string, width: number, height: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, width, height } : tb)));
     const removeTextBox = (id: string) => setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
 
@@ -116,24 +119,6 @@ const App = () => {
                 <div className="left-panel">
                     {pdfUrl ? (
                         <>
-                            <div className="btn-group">
-                                <button
-                                    className="floating-download-btn"
-                                    title="Save PDF"
-                                    onClick={handleSaveToServer}
-                                >
-                                    <svg
-                                        xmlns="http://www.w3.org/2000/svg"
-                                        width="24"
-                                        height="24"
-                                        viewBox="0 0 24 24"
-                                        fill="white"
-                                    >
-                                        <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-10H6V5h9v2z" />
-                                    </svg>
-                                </button>
-                            </div>
-
                             <div className="document-canvas">
                                 <PdfViewer
                                     fileUrl={pdfUrl}
@@ -142,6 +127,7 @@ const App = () => {
                                     moveTextBox={moveTextBox}
                                     addTextBox={addTextBox}
                                     removeTextBox={removeTextBox}
+                                    resizeTextBox={resizeTextBox}
                                     setSelectedTextBoxId={setSelectedTextBoxId}
                                     selectedTextBoxId={selectedTextBoxId}
                                     onDocumentLoadSuccess={(pdf) => setNumPages(pdf.numPages)}
@@ -152,7 +138,7 @@ const App = () => {
                         <p>Loading PDF from storage...</p>
                     )}
                 </div>
-                <RightSidebar />
+                <RightSidebar onSave={handleSaveToServer} />
             </div>
         </div>
     );
