@@ -11,6 +11,7 @@ import { uploadPdf } from "./api/api";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
+import { useParams, useLocation, BrowserRouter } from "react-router-dom";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -33,21 +34,26 @@ const App = () => {
     const [fileName, setFileName] = React.useState<string>("testing.pdf");
     const [numPages, setNumPages] = React.useState<number>(0);
 
+    const location = useLocation();
+    const { fileName1 } = useParams();
 
+    console.log("File Name:", fileName1);
+    console.log("Current Path:", location.pathname);
     React.useEffect(() => {
-        const fetchS3Pdf = async () => {
-            try {
-                const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
-                const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
-                setPdfUrl(response.data.url);
-            } catch (error) {
-                console.error("Error fetching PDF from S3:", error);
-            }
-        };
 
-        fetchS3Pdf();
-        // const storedPdfUrl = "/storage/upload/testing.pdf";
-        // setPdfUrl(storedPdfUrl);
+        // const fetchS3Pdf = async () => {
+        //     try {
+        //         const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
+        //         const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
+        //         setPdfUrl(response.data.url);
+        //     } catch (error) {
+        //         console.error("Error fetching PDF from S3:", error);
+        //     }
+        // };
+
+        // fetchS3Pdf();
+        const storedPdfUrl = "/storage/upload/testing.pdf";
+        setPdfUrl(storedPdfUrl);
     }, []);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
@@ -57,22 +63,10 @@ const App = () => {
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
 
     const wrapForSave = (content: string, fieldType: string | undefined, textBoxIndex: number) => {
-        const raw = content == null ? "" : String(content);
-        const unwrapped = raw.replace(/^\s*\{\{\s*/, "").replace(/\s*\}\}\s*$/, "");
-        const ascii = unwrapped.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-        let slug = ascii
-            .toLowerCase()
-            .replace(/[^a-z0-9]+/g, "-")
-            .replace(/-+/g, "-")
-            .replace(/^-+|-+$/g, "")
-            .replace(/-/g, "");
-
-        const typeCount = textBoxes
-            .slice(0, textBoxIndex)
-            .filter((tb) => tb.fieldType === fieldType)
-            .length;
-
-        return `{{ ${slug}=${typeCount} }}`;
+        if (content?.match(/^\s*\{\{.*\}\}\s*$/)) {
+            return content.trim();
+        }
+        return `{{ ${content?.trim() || ""} }}`;
     };
 
     const handleSaveToServer = async () => {
@@ -90,8 +84,8 @@ const App = () => {
                 const page = pdfDoc.getPage(tb.page - 1);
                 const { height } = page.getSize();
                 page.drawText(wrapForSave(tb.content, tb.fieldType, index), {
-                    x: tb.x + 34,
-                    y: height - tb.y - 38,
+                    x: tb.x,
+                    y: height - tb.y,
                     size: 12,
                     font,
                     color: rgb(0, 0, 0),
@@ -111,6 +105,8 @@ const App = () => {
             toast.error("Error while saving PDF to server.");
         }
     };
+
+
 
     return (
         <div className="app-container">
@@ -166,7 +162,9 @@ const rootElement = document.getElementById("app");
 if (rootElement) {
     ReactDOM.createRoot(rootElement).render(
         <React.StrictMode>
-            <App />
+            <BrowserRouter>
+                <App />
+            </BrowserRouter>
         </React.StrictMode>
     );
 }
