@@ -96,7 +96,7 @@ const RightSidebar = ({ onSave }: RightSidebarProps) => {
       </div>
 
       {/* Download button at the bottom */}
-      {/* {onSave && (
+      {onSave && (
         <div className="rs-download-container">
           <button
             className="rs-download-btn"
@@ -108,14 +108,14 @@ const RightSidebar = ({ onSave }: RightSidebarProps) => {
               width="24"
               height="24"
               viewBox="0 0 24 24"
-              fill="white"
+              fill="currentColor"
             >
               <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-10H6V5h9v2z" />
             </svg>
             Save PDF
           </button>
         </div>
-      )} */}
+      )}
     </aside>
   );
 };

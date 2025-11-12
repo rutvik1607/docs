@@ -273,6 +273,7 @@ body {
   justify-content: center;
   background: #eaeaea;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .document-page {
@@ -484,6 +485,32 @@ body {
   font-size: 14px;
   outline: none;
   color: #065f46; /* dark teal text */
+}
+
+.rs-download-container {
+  margin-top: auto;
+}
+
+.rs-download-btn {
+  width: 100%;
+  border: 1px solid #c7e8df; /* soft teal border */
+  background: #b2d3c8; /* light greenish */
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  color: #2f7d6f; /* dark teal text */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.rs-download-btn:hover {
+  background: #d4e9e2;
+  color: #2f7d6f;
 }
 
 /* Grid of buttons */

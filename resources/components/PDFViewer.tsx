@@ -69,6 +69,24 @@ export default function PdfViewer({
         loadWorker();
     }, [fileUrl]);
 
+    useEffect(() => {
+        if (textBoxes.length === 0) {
+            const stored = localStorage.getItem(`pdf-textboxes-${fileUrl}`);
+            if (stored) {
+                try {
+                    const parsed: TextBox[] = JSON.parse(stored);
+                    parsed.forEach(box => addTextBox(box));
+                } catch (e) {
+                    console.error('Error loading textBoxes from localStorage', e);
+                }
+            }
+        }
+    }, [fileUrl, textBoxes.length, addTextBox]);
+
+    useEffect(() => {
+        localStorage.setItem(`pdf-textboxes-${fileUrl}`, JSON.stringify(textBoxes));
+    }, [textBoxes, fileUrl]);
+
     const handleDocumentLoadSuccess = (pdf: any) => {
         setLoadError(null);
         setNumPages(pdf.numPages);
@@ -131,10 +149,10 @@ export default function PdfViewer({
                                         // Generate label like {{textbox=0}}, {{date=1}}, etc.
                                         const content = `{{${fieldType}=${sameTypeCount}}}`;
 
-                                        const id =
-                                            typeof crypto !== "undefined" && (crypto as any).randomUUID
-                                                ? (crypto as any).randomUUID()
-                                                : `tb_${Date.now()}`;
+                                        const lastId = localStorage.getItem('globalTextBoxId') || '0';
+                                        const newIdNum = parseInt(lastId) + 1;
+                                        localStorage.setItem('globalTextBoxId', newIdNum.toString());
+                                        const id = `tb_${newIdNum}`;
 
                                         addTextBox({ id, page: pageNumber, x, y, content, fieldType, ...(fieldType === "billing" ? { width: 127, height: 30 } : {}) });
                                     } catch (err) {
@@ -257,73 +275,75 @@ export default function PdfViewer({
                                                     onPointerDown={onPointerDown}
                                                 >
                                                     {tb.content}
-                                                    {tb.id === selectedTextBoxId && isBilling && (
+                                                    {tb.id === selectedTextBoxId && (
                                                         <>
-                                                            <div
-                                                                style={{
-                                                                    position: "absolute",
-                                                                    right: -5,
-                                                                    bottom: -5,
-                                                                    width: 10,
-                                                                    height: 10,
-                                                                    background: "#49806e",
-                                                                    cursor: "se-resize",
-                                                                    borderRadius: "2px",
-                                                                }}
-                                                                onPointerDown={(e) => {
-                                                                    e.stopPropagation();
-                                                                    (e.target as Element).setPointerCapture(e.pointerId);
-                                                                    const tbWidth = tb.width || 100;
-                                                                    const tbHeight = tb.height || 30;
-                                                                    resizingRef.current = {
-                                                                        id: tb.id,
-                                                                        page: pageNumber,
-                                                                        startClientX: e.clientX,
-                                                                        startClientY: e.clientY,
-                                                                        origWidth: tbWidth,
-                                                                        origHeight: tbHeight,
-                                                                    };
+                                                            {isBilling && (
+                                                                <div
+                                                                    style={{
+                                                                        position: "absolute",
+                                                                        right: -5,
+                                                                        bottom: -5,
+                                                                        width: 10,
+                                                                        height: 10,
+                                                                        background: "#49806e",
+                                                                        cursor: "se-resize",
+                                                                        borderRadius: "2px",
+                                                                    }}
+                                                                    onPointerDown={(e) => {
+                                                                        e.stopPropagation();
+                                                                        (e.target as Element).setPointerCapture(e.pointerId);
+                                                                        const tbWidth = tb.width || 100;
+                                                                        const tbHeight = tb.height || 30;
+                                                                        resizingRef.current = {
+                                                                            id: tb.id,
+                                                                            page: pageNumber,
+                                                                            startClientX: e.clientX,
+                                                                            startClientY: e.clientY,
+                                                                            origWidth: tbWidth,
+                                                                            origHeight: tbHeight,
+                                                                        };
 
-                                                                    const onPointerMove = (moveEv: PointerEvent) => {
-                                                                        if (!resizingRef.current) return;
-                                                                        const r = resizingRef.current;
-                                                                        const pageIdx = r.page - 1;
-                                                                        const pn =
-                                                                            containerRef.current?.querySelectorAll(
-                                                                                ".react-pdf__Page"
-                                                                            )[pageIdx] as HTMLElement | undefined;
-                                                                        if (!pn || !pageDims[pageIdx]) return;
-                                                                        const rect = pn.getBoundingClientRect();
-                                                                        const currentScale = pageDims[pageIdx]
-                                                                            ? rect.width / pageDims[pageIdx].width
-                                                                            : 1;
-                                                                        const deltaX =
-                                                                            (moveEv.clientX - r.startClientX) / currentScale;
-                                                                        const deltaY =
-                                                                            (moveEv.clientY - r.startClientY) / currentScale;
-                                                                        const newWidth = Math.max(50, r.origWidth + deltaX);
-                                                                        const newHeight = Math.max(20, r.origHeight + deltaY);
-                                                                        resizeTextBox(r.id, newWidth, newHeight);
-                                                                    };
+                                                                        const onPointerMove = (moveEv: PointerEvent) => {
+                                                                            if (!resizingRef.current) return;
+                                                                            const r = resizingRef.current;
+                                                                            const pageIdx = r.page - 1;
+                                                                            const pn =
+                                                                                containerRef.current?.querySelectorAll(
+                                                                                    ".react-pdf__Page"
+                                                                                )[pageIdx] as HTMLElement | undefined;
+                                                                            if (!pn || !pageDims[pageIdx]) return;
+                                                                            const rect = pn.getBoundingClientRect();
+                                                                            const currentScale = pageDims[pageIdx]
+                                                                                ? rect.width / pageDims[pageIdx].width
+                                                                                : 1;
+                                                                            const deltaX =
+                                                                                (moveEv.clientX - r.startClientX) / currentScale;
+                                                                            const deltaY =
+                                                                                (moveEv.clientY - r.startClientY) / currentScale;
+                                                                            const newWidth = Math.max(50, r.origWidth + deltaX);
+                                                                            const newHeight = Math.max(20, r.origHeight + deltaY);
+                                                                            resizeTextBox(r.id, newWidth, newHeight);
+                                                                        };
 
-                                                                    const onPointerUp = (upEv: PointerEvent) => {
-                                                                        try {
-                                                                            (e.target as Element).releasePointerCapture(
-                                                                                e.pointerId
+                                                                        const onPointerUp = (upEv: PointerEvent) => {
+                                                                            try {
+                                                                                (e.target as Element).releasePointerCapture(
+                                                                                    e.pointerId
+                                                                                );
+                                                                            } catch {}
+                                                                            window.removeEventListener(
+                                                                                "pointermove",
+                                                                                onPointerMove
                                                                             );
-                                                                        } catch {}
-                                                                        window.removeEventListener(
-                                                                            "pointermove",
-                                                                            onPointerMove
-                                                                        );
-                                                                        window.removeEventListener("pointerup", onPointerUp);
-                                                                        resizingRef.current = null;
-                                                                    };
+                                                                            window.removeEventListener("pointerup", onPointerUp);
+                                                                            resizingRef.current = null;
+                                                                        };
 
-                                                                    window.addEventListener("pointermove", onPointerMove);
-                                                                    window.addEventListener("pointerup", onPointerUp);
-                                                                }}
-                                                            />
+                                                                        window.addEventListener("pointermove", onPointerMove);
+                                                                        window.addEventListener("pointerup", onPointerUp);
+                                                                    }}
+                                                                />
+                                                            )}
                                                             <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
