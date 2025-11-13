@@ -6,3 +6,5 @@ use App\Http\Controllers\S3FileController;
 
 Route::post('/upload-pdf', [PdfUploadController::class, 'store']);
 Route::get('/s3-file/{path}', [S3FileController::class, 'getFileUrl'])->where('path', '.*');
+
+Route::get('/test', [PdfUploadController::class, 'test']);

@@ -45,17 +45,16 @@ const App = () => {
     console.log("Current Path:", location.pathname);
     React.useEffect(() => {
 
-        // const fetchS3Pdf = async () => {
-        //     try {
-        //         const path = "5/templates/789beea5-e638-4149-8f2c-1a32527f5b5a.pdf";
-        //         const response = await axios.get(`http://localhost:8000/api/s3-file/${path}`);
-        //         setPdfUrl(response.data.url);
-        //     } catch (error) {
-        //         console.error("Error fetching PDF from S3:", error);
-        //     }
-        // };
+        const fetchS3Pdf = async () => {
+            try {
+                const response = await axios.get(`http://localhost:8000/api/test`);
+                console.log("response", response);
+            } catch (error) {
+                console.error("Error fetching PDF from S3:", error);
+            }
+        };
 
-        // fetchS3Pdf();
+        fetchS3Pdf();
         const storedPdfUrl = "/storage/upload/testing.pdf";
         setPdfUrl(storedPdfUrl);
 

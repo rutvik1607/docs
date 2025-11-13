@@ -16,4 +16,9 @@ class PdfUploadController extends Controller
 
         return response()->json(['error' => 'No file uploaded'], 400);
     }
+
+    public function test()
+    {
+        return response()->json(['message' => 'Test endpoint reached', 'path' => "/storage/upload/testing.pdf"], 200);
+    }
 }
