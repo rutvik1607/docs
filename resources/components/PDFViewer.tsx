@@ -47,6 +47,8 @@ export default function PdfViewer({
         startClientY: number;
         origX: number;
         origY: number;
+        lastX: number;
+        lastY: number;
     } | null>(null);
     const resizingRef = useRef<{
         id: string;
@@ -69,19 +71,7 @@ export default function PdfViewer({
         loadWorker();
     }, [fileUrl]);
 
-    useEffect(() => {
-        if (textBoxes.length === 0) {
-            const stored = localStorage.getItem(`pdf-textboxes-${fileUrl}`);
-            if (stored) {
-                try {
-                    const parsed: TextBox[] = JSON.parse(stored);
-                    parsed.forEach(box => addTextBox(box));
-                } catch (e) {
-                    console.error('Error loading textBoxes from localStorage', e);
-                }
-            }
-        }
-    }, [fileUrl, textBoxes.length, addTextBox]);
+
 
     useEffect(() => {
         localStorage.setItem(`pdf-textboxes-${fileUrl}`, JSON.stringify(textBoxes));
@@ -142,12 +132,17 @@ export default function PdfViewer({
                                         const y = (e.clientY - rect.top) / scale;
 
                                         const fieldType = payload.fieldType ?? "text";
-                                        const sameTypeCount = textBoxes.filter(
-                                            (tb) => tb.fieldType === fieldType
-                                        ).length;
+                                        const existingNumbers = textBoxes
+                                            .filter((tb) => tb.fieldType === fieldType)
+                                            .map((tb) => {
+                                                const match = tb.content.match(/\{\{(\w+)=(\d+)\}\}/);
+                                                return match ? parseInt(match[2]) : -1;
+                                            })
+                                            .filter((num) => num >= 0);
+                                        const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 0;
 
                                         // Generate label like {{textbox=0}}, {{date=1}}, etc.
-                                        const content = `{{${fieldType}=${sameTypeCount}}}`;
+                                        const content = `{{${fieldType}=${nextNumber}}}`;
 
                                         const lastId = localStorage.getItem('globalTextBoxId') || '0';
                                         const newIdNum = parseInt(lastId) + 1;
@@ -204,6 +199,8 @@ export default function PdfViewer({
                                                     startClientY: e.clientY,
                                                     origX: tb.x,
                                                     origY: tb.y,
+                                                    lastX: tb.x,
+                                                    lastY: tb.y,
                                                 };
                                                 setSelectedTextBoxId(tb.id);
 
@@ -226,6 +223,8 @@ export default function PdfViewer({
                                                         (moveEv.clientY - d.startClientY) / currentScale;
                                                     const newX = d.origX + deltaX;
                                                     const newY = d.origY + deltaY;
+                                                    d.lastX = newX;
+                                                    d.lastY = newY;
                                                     moveTextBox(d.id, newX, newY);
                                                 };
 
@@ -235,6 +234,12 @@ export default function PdfViewer({
                                                             e.pointerId
                                                         );
                                                     } catch {}
+                                                    if (draggingRef.current && containerRef.current) {
+                                                        const containerRect = containerRef.current.getBoundingClientRect();
+                                                        if (upEv.clientX < containerRect.left || upEv.clientX > containerRect.right || upEv.clientY < containerRect.top || upEv.clientY > containerRect.bottom) {
+                                                            removeTextBox(draggingRef.current.id);
+                                                        }
+                                                    }
                                                     window.removeEventListener(
                                                         "pointermove",
                                                         onPointerMove
@@ -388,6 +393,7 @@ export default function PdfViewer({
                         </>
                     );
                 })}
+                <div style={{ height: '30px' }} />
             </Document>
         </div>
     );

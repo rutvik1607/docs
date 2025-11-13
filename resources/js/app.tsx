@@ -36,6 +36,8 @@ const App = () => {
     const [fileName, setFileName] = React.useState<string>("testing.pdf");
     const [numPages, setNumPages] = React.useState<number>(0);
 
+    const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
+
     const location = useLocation();
     const { fileName1 } = useParams();
 
@@ -65,12 +67,34 @@ const App = () => {
         }
     }, []);
 
+    // Update ref with latest textBoxes
     React.useEffect(() => {
-        if (pdfUrl) {
-            const storageKey = `pdf-textBoxes-${pdfUrl}`;
-            localStorage.setItem(storageKey, JSON.stringify(textBoxes));
-        }
-    }, [textBoxes, pdfUrl]);
+        textBoxesRef.current = textBoxes;
+    }, [textBoxes]);
+
+    // Save textBoxes to localStorage on page unload or route change
+    React.useEffect(() => {
+        const saveToStorage = () => {
+            if (pdfUrl) {
+                const storageKey = `pdf-textBoxes-${pdfUrl}`;
+                localStorage.setItem(storageKey, JSON.stringify(textBoxesRef.current));
+            }
+        };
+
+        // Save on route change
+        saveToStorage();
+
+        // Save on page unload/refresh
+        const handleBeforeUnload = () => {
+            saveToStorage();
+        };
+
+        window.addEventListener('beforeunload', handleBeforeUnload);
+
+        return () => {
+            window.removeEventListener('beforeunload', handleBeforeUnload);
+        };
+    }, [location.pathname, pdfUrl]);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
     const updateTextBox = (id: string, content: string) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, content } : tb)));
