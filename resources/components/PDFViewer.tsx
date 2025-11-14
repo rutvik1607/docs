@@ -149,7 +149,10 @@ export default function PdfViewer({
                                         localStorage.setItem('globalTextBoxId', newIdNum.toString());
                                         const id = `tb_${newIdNum}`;
 
-                                        addTextBox({ id, page: pageNumber, x, y, content, fieldType, ...(fieldType === "billing" ? { width: 127, height: 30 } : {}) });
+                                        const width = fieldType === "billing" ? 180 : Math.max(60, content.length * 6 + 12);
+                                        const height = 30;
+
+                                        addTextBox({ id, page: pageNumber, x, y, content, fieldType, width, height });
                                     } catch (err) {
                                         console.error("Drop parse error", err);
                                     }
@@ -234,10 +237,17 @@ export default function PdfViewer({
                                                             e.pointerId
                                                         );
                                                     } catch {}
-                                                    if (draggingRef.current && containerRef.current) {
-                                                        const containerRect = containerRef.current.getBoundingClientRect();
-                                                        if (upEv.clientX < containerRect.left || upEv.clientX > containerRect.right || upEv.clientY < containerRect.top || upEv.clientY > containerRect.bottom) {
-                                                            removeTextBox(draggingRef.current.id);
+                                                    if (draggingRef.current) {
+                                                        const d = draggingRef.current;
+                                                        const pageDim = pageDims[d.page - 1];
+                                                        if (pageDim) {
+                                                            const tb = textBoxes.find(t => t.id === d.id);
+                                                            if (tb) {
+                                                                console.log(tb,'tb.width')
+                                                                const clampedX = Math.max(0, Math.min(d.lastX, pageDim.width - (tb.fieldType === "billing" && tb.width ?tb.width - 55: tb.width || 0)));
+                                                                const clampedY = Math.max(0, Math.min(d.lastY, pageDim.height - (tb.height || 0)));
+                                                                moveTextBox(d.id, clampedX, clampedY);
+                                                            }
                                                         }
                                                     }
                                                     window.removeEventListener(
@@ -253,6 +263,7 @@ export default function PdfViewer({
                                             };
 
                                             const isBilling = tb.fieldType === "billing";
+                                            // console.log(tb.width,'tb.widthtb.widthtb.width')
                                             return (
                                                 <div
                                                     key={tb.id}

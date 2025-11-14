@@ -31,6 +31,7 @@ const App = () => {
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
+    const hasFetchedRef = React.useRef(false);
     const [selectedTextBoxId, setSelectedTextBoxIdState] = React.useState<string | null>(null);
     const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
     const [fileName, setFileName] = React.useState<string>("testing.pdf");
@@ -44,17 +45,20 @@ const App = () => {
     console.log("File Name:", fileName1);
     console.log("Current Path:", location.pathname);
     React.useEffect(() => {
+        if (!hasFetchedRef.current) {
+            hasFetchedRef.current = true;
 
-        const fetchS3Pdf = async () => {
-            try {
-                const response = await axios.get(`http://localhost:8000/api/test`);
-                console.log("response", response);
-            } catch (error) {
-                console.error("Error fetching PDF from S3:", error);
-            }
-        };
+            const fetchS3Pdf = async () => {
+                try {
+                    const response = await axios.get(`http://localhost:8000/api/test`);
+                    console.log("response", response);
+                } catch (error) {
+                    console.error("Error fetching PDF from S3:", error);
+                }
+            };
 
-        fetchS3Pdf();
+            fetchS3Pdf();
+        }
         const storedPdfUrl = "/storage/upload/testing.pdf";
         setPdfUrl(storedPdfUrl);
 
@@ -125,7 +129,7 @@ const App = () => {
                 const { height } = page.getSize();
                 page.drawText(wrapForSave(tb.content, tb.fieldType, index), {
                     x: tb.x,
-                    y: height - tb.y,
+                    y: height - tb.y - 12,
                     size: 12,
                     font,
                     color: rgb(0, 0, 0),
