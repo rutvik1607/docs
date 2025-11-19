@@ -139,7 +139,7 @@ export default function PdfViewer({
                                                 return match ? parseInt(match[2]) : -1;
                                             })
                                             .filter((num) => num >= 0);
-                                        const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
+                                        const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 0;
 
                                         // Generate label like {{textbox=0}}, {{date=1}}, etc.
                                         const content = `{{${fieldType}=${nextNumber}}}`;
