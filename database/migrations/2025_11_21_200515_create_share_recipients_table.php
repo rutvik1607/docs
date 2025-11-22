@@ -16,6 +16,7 @@ return new class extends Migration
             $table->integer('template_id');
             $table->integer('user_id');
             $table->integer('recipient_id');
+            $table->longText('link')->nullable();
             $table->longText('field_json')->nullable();
             $table->date('date')->nullable();
             $table->text('token')->nullable();

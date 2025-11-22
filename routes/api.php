@@ -12,3 +12,6 @@ Route::get('/test', [PdfUploadController::class, 'test']);
 
 Route::post('add-recipient', [RecipientController::class, 'addRecipient']);
 Route::post('recipients-list', [RecipientController::class, 'recipientList']);
+Route::post('search-recipient', [RecipientController::class, 'searchRecipient']);
+Route::post('share-recipient', [RecipientController::class, 'shareRecipient']);
+Route::post('update-template', [RecipientController::class, 'updateTemplate']);

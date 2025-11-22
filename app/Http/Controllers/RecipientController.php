@@ -6,6 +6,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Mail;
+use App\Mail\ShareRecipientMail;
 use Carbon\Carbon;
 use Exception;
 use DB;
@@ -134,6 +136,274 @@ class RecipientController extends Controller
                 'error_code'  => 5000,
                 'message'     => 'Something went wrong',
                 'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function searchRecipient(Request $request)
+    {
+        try {
+
+            // ------------------------------
+            // VALIDATION
+            // ------------------------------
+            $validator = Validator::make($request->all(), [
+                'keyword' => 'required',
+                'user_id' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,   // Validation error code
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $user = $request->user_id; // logged-in user / org user id
+            
+            $search = $request->keyword;
+
+            $recipients = \DB::table('recipients')
+                ->where('created_by', $user)
+                ->where('status', '!=', 2)
+                ->select('first_name', 'last_name', 'email')
+                ->where(function($query) use ($search) {
+                    $query->where('first_name', 'LIKE', "%{$search}%")
+                          ->orWhere('last_name', 'LIKE', "%{$search}%")
+                          ->orWhereRaw("CONCAT(first_name, ' ', last_name) LIKE ?", ["%{$search}%"])
+                          ->orWhere('email', 'LIKE', "%{$search}%");
+                })
+                ->limit(10)
+                ->get();
+
+            // ---------------------------------
+            // SUCCESS RESPONSE
+            // ---------------------------------
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Recipient search result',
+                'data'         => $recipients
+            ], 200);
+
+        } catch (Exception $e) {
+
+            // ---------------------------------
+            // FAILED RESPONSE
+            // ---------------------------------
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function shareRecipient(Request $request)
+    {
+        try {
+
+            // ------------------------------
+            // VALIDATION
+            // ------------------------------
+            $validator = Validator::make($request->all(), [
+                'recipient_ids'   => 'required|array|min:1',
+                'recipient_ids.*' => 'required|integer|exists:recipients,id',
+                'template_id' => 'required',
+                'user_id' => 'required',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,   // Validation error code
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $recipientIds = $request->recipient_ids;
+            $userId       = $request->user_id;
+            $templateId   = $request->template_id;
+            $user   = [];
+            $insertData = [];
+            $now = now();
+
+            // ----------------------------------
+            // CHECK — recipients belong to user
+            // ----------------------------------
+            $recipients = DB::table('recipients')
+                ->whereIn('id', $recipientIds)
+                ->where('created_by', $userId)
+                ->where('status', 1)
+                ->select('id', 'email', 'first_name')
+                ->get();
+
+            if (count($recipients) != count($recipientIds)) {
+                return response()->json([
+                    'status'     => false,
+                    'error_code' => 403,
+                    'message'    => 'One or more recipients do not belong to this user'
+                ], 403);
+            }
+
+            foreach ($recipients as $rec) {
+
+                $payload = [
+                    'recipient_id' => $rec->id,
+                    'email'        => $rec->email,
+                    'template_id'  => $templateId,
+                    'timestamp'    => time()
+                ];
+
+                $encryptedString = encrypt(json_encode($payload));
+
+                $secureLink = route('shared.document.link', $encryptedString);
+                
+                $insertData[] = [
+                    'template_id' => $templateId,
+                    'user_id'  => $userId,
+                    'recipient_id' => $rec->id,
+                    'link'   => $secureLink,
+                    'date'  => $now,
+                    'created_at'  => $now,
+                    'updated_at'  => $now
+                ];
+
+                Mail::to($rec->email)->send(new ShareRecipientMail($user, $rec, $secureLink));
+            }
+
+            DB::table('share_recipients')->insert($insertData);
+
+            // ---------------------------
+            // SUCCESS RESPONSE
+            // ---------------------------
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Recipients assigned successfully',
+                'data'         => $insertData
+            ], 200);
+
+        } catch (Exception $e) {
+
+            // ---------------------------------
+            // FAILED RESPONSE
+            // ---------------------------------
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function openDocument($encrypted)
+    {
+        try {
+            $payload = json_decode(decrypt($encrypted), true);
+
+            // Check data integrity
+            if (!$payload || !isset($payload['recipient_id']) || !isset($payload['email'])) {
+                return "Invalid or expired link";
+            }
+
+            // Validate recipient still exists
+            $recipient = DB::table('recipients')
+                ->where('id', $payload['recipient_id'])
+                ->where('email', $payload['email'])
+                ->first();
+
+            if (!$recipient) {
+                return "Invalid user";
+            }
+
+            $template = [];
+            // Fetch template data
+            // $template = DB::table('templates')->where('id', $payload['template_id'])->first();
+
+            // if (!$template) {
+            //     return "Template not found";
+            // }
+
+            return view('open-document', [
+                'recipient' => $recipient,
+                'template'  => $template
+            ]);
+
+        } catch (\Throwable $e) {
+            return "Link Invalid or Tampered";
+        }
+    }
+
+    public function updateTemplate(Request $request)
+    {
+        try {
+
+            // -------------------------------
+            // VALIDATION
+            // -------------------------------
+            $validator = Validator::make($request->all(), [
+                'text' => 'required|array',
+                'text.value' => 'required',
+                'text.token' => 'required',
+            ], [
+                'text.required' => 'Text object is required.',
+                'text.value.required' => 'Text value is required.',
+                'text.token.required' => 'Token is required.',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status' => false,
+                    'code'   => 422,
+                    'message' => 'Validation Error',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $shareRecipients = DB::table('share_recipients')
+                ->where('token', $request->text['token'])
+                ->first();
+
+            if (!$shareRecipients) {
+                return response()->json([
+                    'status' => false,
+                    'code'   => 404,
+                    'message' => 'Recipients not found',
+                ], 404);
+            }
+
+            // DB::table('share_recipients')
+            //     ->where('template_id', $request->template_id)
+            //     ->where('user_id', $request->user_id)
+            //     ->where('recipient_id', $request->recipient_id)
+            //     ->update([
+            //         'field_json' => $request->text['value'],
+            //         'updated_at' => now(),
+            //     ]);
+
+            // --------------------------------------------
+            // SUCCESS RESPONSE
+            // --------------------------------------------
+            return response()->json([
+                'status'  => true,
+                'code'    => 200,
+                'message' => 'Template updated successfully',
+                'data' => []
+            ], 200);
+
+        } catch (\Throwable $e) {
+
+            return response()->json([
+                'status' => false,
+                'code'   => 500,
+                'message' => 'Something went wrong',
+                'error'   => $e->getMessage()
             ], 500);
         }
     }
