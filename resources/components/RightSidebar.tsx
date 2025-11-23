@@ -64,6 +64,7 @@ interface RightSidebarProps {
     setReciepentModal: React.Dispatch<React.SetStateAction<boolean>>;
     templateId?: number;
     userId?: number;
+    onRecipientUpdate?: (recipients: Recipient[]) => void;
 }
 
 interface RightSidebarHandle {
@@ -75,6 +76,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
     setReciepentModal,
     templateId = 1,
     userId = 1,
+    onRecipientUpdate,
 }, ref) => {
     const [recipients, setRecipients] = useState<Recipient[]>([]);
     const [loading, setLoading] = useState(false);
@@ -98,6 +100,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
             const response = await getRecipientsByTemplate(templateId);
             if (response.status) {
                 setRecipients(response.data);
+                onRecipientUpdate?.(response.data);
             }
         } catch (error) {
             console.error("Failed to fetch recipients:", error);
@@ -141,9 +144,9 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
         try {
             const response = await deleteRecipient(templateId, userId, deleteConfirmation.recipientId);
             if (response.status) {
-                setRecipients(
-                    recipients.filter((r) => r.id !== deleteConfirmation.recipientId)
-                );
+                const updatedRecipients = recipients.filter((r) => r.id !== deleteConfirmation.recipientId);
+                setRecipients(updatedRecipients);
+                onRecipientUpdate?.(updatedRecipients);
                 setDeleteConfirmation({
                     isOpen: false,
                     recipientId: null,

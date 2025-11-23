@@ -519,4 +519,81 @@ class RecipientController extends Controller
             ], 500);
         }
     }
+
+    public function saveFieldAssignments(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'template_id' => 'required|integer',
+                'user_id' => 'required|integer',
+                'fields' => 'required|array',
+                'fields.*.id' => 'required|string',
+                'fields.*.recipientId' => 'required|integer',
+                'fields.*.content' => 'required|string',
+                'fields.*.fieldType' => 'nullable|string',
+                'fields.*.page' => 'required|integer',
+                'fields.*.x' => 'required|numeric',
+                'fields.*.y' => 'required|numeric',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $templateId = $request->template_id;
+            $userId = $request->user_id;
+            $fields = $request->fields;
+
+            $groupedByRecipient = [];
+            foreach ($fields as $field) {
+                $recipientId = $field['recipientId'];
+                if (!isset($groupedByRecipient[$recipientId])) {
+                    $groupedByRecipient[$recipientId] = [];
+                }
+                $groupedByRecipient[$recipientId][] = [
+                    'id' => $field['id'],
+                    'content' => $field['content'],
+                    'fieldType' => $field['fieldType'] ?? 'text',
+                    'page' => $field['page'],
+                    'x' => $field['x'],
+                    'y' => $field['y'],
+                ];
+            }
+
+            $updated = [];
+            foreach ($groupedByRecipient as $recipientId => $fields) {
+                $updated[] = DB::table('share_recipients')
+                    ->where('template_id', $templateId)
+                    ->where('user_id', $userId)
+                    ->where('recipient_id', $recipientId)
+                    ->update([
+                        'field_json' => json_encode($fields),
+                        'updated_at' => now(),
+                    ]);
+            }
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Field assignments saved successfully',
+                'data'         => [
+                    'updated_records' => array_sum($updated)
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
 }

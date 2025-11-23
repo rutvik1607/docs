@@ -99,3 +99,18 @@ export const shareRecipient = async (recipientIds, templateId, userId) => {
         throw error;
     }
 };
+
+// Save field assignments to database
+export const saveFieldAssignments = async (templateId, userId, fields) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/save-field-assignments`, {
+            template_id: templateId,
+            user_id: userId,
+            fields: fields
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to save field assignments:", error);
+        throw error;
+    }
+};

@@ -11,6 +11,14 @@ interface TextBox {
     fieldType?: string;
     width?: number;
     height?: number;
+    recipientId?: number | null;
+}
+
+interface Recipient {
+    id: number;
+    first_name: string;
+    last_name: string;
+    email: string;
 }
 
 interface PdfViewerProps {
@@ -24,6 +32,9 @@ interface PdfViewerProps {
     selectedTextBoxId: string | null;
     onDocumentLoadSuccess?: (pdf: any) => void;
     updateTextBox: (id: string, content: string) => void;
+    isAssignmentMode?: boolean;
+    recipients?: Recipient[];
+    onUpdateTextBox?: (id: string, recipientId: number | null) => void;
 }
 
 export default function PdfViewer({
@@ -36,6 +47,9 @@ export default function PdfViewer({
     setSelectedTextBoxId,
     selectedTextBoxId,
     onDocumentLoadSuccess,
+    isAssignmentMode = false,
+    recipients = [],
+    onUpdateTextBox,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
@@ -264,6 +278,8 @@ export default function PdfViewer({
                                             };
 
                                             const isBilling = tb.fieldType === "billing";
+                                            const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
+                                            const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#e8f2ef";
                                             // console.log(tb.width,'tb.widthtb.widthtb.width')
                                             return (
                                                 <div
@@ -272,122 +288,170 @@ export default function PdfViewer({
                                                         position: "absolute",
                                                         left,
                                                         top,
-                                                        ...(isBilling ? { width: tb.width || 100, height: tb.height || 30, display: "flex", alignItems: "center", justifyContent: "center" } : {}),
                                                         zIndex: 10,
-                                                        background: "#e8f2ef",
+                                                    }}
+                                                    onPointerDown={!isAssignmentMode ? onPointerDown : undefined}
+                                                >
+                                                    <div style={{
+                                                        background: backgroundColor,
+                                                        ...(isBilling ? { width: tb.width || 100, height: tb.height || 30, display: "flex", alignItems: "center", justifyContent: "center" } : {}),
                                                         border:
-                                                            tb.id === selectedTextBoxId
-                                                                ? "2px solid #49806e"
-                                                                : "1px solid #49806e",
+                                                            tb.id === selectedTextBoxId || isAssignmentMode
+                                                                ? `2px solid ${borderColor}`
+                                                                : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`,
                                                         borderRadius: "4px",
                                                         padding: "4px 8px",
                                                         color: "rgb(36,133,103)",
                                                         fontWeight: "bold",
                                                         fontSize: "14px",
                                                         fontFamily: "monospace",
-                                                        cursor: "move",
+                                                        cursor: isAssignmentMode ? "default" : "move",
                                                         userSelect: "none",
                                                         ...(isBilling ? { boxSizing: "border-box" } : {}),
-                                                    }}
-                                                    onPointerDown={onPointerDown}
-                                                >
-                                                    {tb.content}
-                                                    {tb.id === selectedTextBoxId && (
-                                                        <>
-                                                            {isBilling && (
-                                                                <div
+                                                    }}>
+                                                        {tb.content}
+                                                        {isAssignmentMode && (
+                                                            <div
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    top: '100%',       /* Show above */
+                                                                    left: '50%',
+                                                                    transform: 'translateX(-50%)',
+                                                                    background: 'white',
+                                                                    // padding: '6px',
+                                                                    borderRadius: '4px',
+                                                                    border: '1px solid #ccc',
+                                                                    boxShadow: "0px 2px 8px rgba(0,0,0,0.15)",
+                                                                    marginTop: "6px",
+                                                                    whiteSpace: "nowrap",
+                                                                    zIndex: "999",
+                                                                    marginLeft: "8px",
+                                                                    display: "inline-block",
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <select
+                                                                    value={tb.recipientId || ""}
+                                                                    onChange={(e) => {
+                                                                        const recipientId = e.target.value ? parseInt(e.target.value) : null;
+                                                                        onUpdateTextBox?.(tb.id, recipientId);
+                                                                    }}
                                                                     style={{
-                                                                        position: "absolute",
-                                                                        right: -5,
-                                                                        bottom: -5,
-                                                                        width: 10,
-                                                                        height: 10,
-                                                                        background: "#49806e",
-                                                                        cursor: "se-resize",
+                                                                        padding: "6px 8px",
+                                                                        fontSize: "12px",
+                                                                        border: "none",
                                                                         borderRadius: "2px",
+                                                                        cursor: "pointer",
+                                                                        fontFamily: "inherit",
+                                                                        backgroundColor: "#fff",
                                                                     }}
-                                                                    onPointerDown={(e) => {
-                                                                        e.stopPropagation();
-                                                                        (e.target as Element).setPointerCapture(e.pointerId);
-                                                                        const tbWidth = tb.width || 100;
-                                                                        const tbHeight = tb.height || 30;
-                                                                        resizingRef.current = {
-                                                                            id: tb.id,
-                                                                            page: pageNumber,
-                                                                            startClientX: e.clientX,
-                                                                            startClientY: e.clientY,
-                                                                            origWidth: tbWidth,
-                                                                            origHeight: tbHeight,
-                                                                        };
+                                                                >
+                                                                    <option style={{}} value="">Assign Reciepent</option>
+                                                                    {recipients.map((recipient) => (
+                                                                        <option key={recipient.id} value={recipient.id}>
+                                                                            {recipient.first_name} {recipient.last_name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+                                                        {tb.id === selectedTextBoxId && (
+                                                            <>
+                                                                {isBilling && (
+                                                                    <div
+                                                                        style={{
+                                                                            position: "absolute",
+                                                                            right: -5,
+                                                                            bottom: -5,
+                                                                            width: 10,
+                                                                            height: 10,
+                                                                            background: "#49806e",
+                                                                            cursor: "se-resize",
+                                                                            borderRadius: "2px",
+                                                                        }}
+                                                                        onPointerDown={(e) => {
+                                                                            e.stopPropagation();
+                                                                            (e.target as Element).setPointerCapture(e.pointerId);
+                                                                            const tbWidth = tb.width || 100;
+                                                                            const tbHeight = tb.height || 30;
+                                                                            resizingRef.current = {
+                                                                                id: tb.id,
+                                                                                page: pageNumber,
+                                                                                startClientX: e.clientX,
+                                                                                startClientY: e.clientY,
+                                                                                origWidth: tbWidth,
+                                                                                origHeight: tbHeight,
+                                                                            };
 
-                                                                        const onPointerMove = (moveEv: PointerEvent) => {
-                                                                            if (!resizingRef.current) return;
-                                                                            const r = resizingRef.current;
-                                                                            const pageIdx = r.page - 1;
-                                                                            const pn =
-                                                                                containerRef.current?.querySelectorAll(
-                                                                                    ".react-pdf__Page"
-                                                                                )[pageIdx] as HTMLElement | undefined;
-                                                                            if (!pn || !pageDims[pageIdx]) return;
-                                                                            const rect = pn.getBoundingClientRect();
-                                                                            const currentScale = pageDims[pageIdx]
-                                                                                ? rect.width / pageDims[pageIdx].width
-                                                                                : 1;
-                                                                            const deltaX =
-                                                                                (moveEv.clientX - r.startClientX) / currentScale;
-                                                                            const deltaY =
-                                                                                (moveEv.clientY - r.startClientY) / currentScale;
-                                                                            const newWidth = Math.max(50, r.origWidth + deltaX);
-                                                                            const newHeight = Math.max(20, r.origHeight + deltaY);
-                                                                            resizeTextBox(r.id, newWidth, newHeight);
-                                                                        };
+                                                                            const onPointerMove = (moveEv: PointerEvent) => {
+                                                                                if (!resizingRef.current) return;
+                                                                                const r = resizingRef.current;
+                                                                                const pageIdx = r.page - 1;
+                                                                                const pn =
+                                                                                    containerRef.current?.querySelectorAll(
+                                                                                        ".react-pdf__Page"
+                                                                                    )[pageIdx] as HTMLElement | undefined;
+                                                                                if (!pn || !pageDims[pageIdx]) return;
+                                                                                const rect = pn.getBoundingClientRect();
+                                                                                const currentScale = pageDims[pageIdx]
+                                                                                    ? rect.width / pageDims[pageIdx].width
+                                                                                    : 1;
+                                                                                const deltaX =
+                                                                                    (moveEv.clientX - r.startClientX) / currentScale;
+                                                                                const deltaY =
+                                                                                    (moveEv.clientY - r.startClientY) / currentScale;
+                                                                                const newWidth = Math.max(50, r.origWidth + deltaX);
+                                                                                const newHeight = Math.max(20, r.origHeight + deltaY);
+                                                                                resizeTextBox(r.id, newWidth, newHeight);
+                                                                            };
 
-                                                                        const onPointerUp = (upEv: PointerEvent) => {
-                                                                            try {
-                                                                                (e.target as Element).releasePointerCapture(
-                                                                                    e.pointerId
+                                                                            const onPointerUp = (upEv: PointerEvent) => {
+                                                                                try {
+                                                                                    (e.target as Element).releasePointerCapture(
+                                                                                        e.pointerId
+                                                                                    );
+                                                                                } catch {}
+                                                                                window.removeEventListener(
+                                                                                    "pointermove",
+                                                                                    onPointerMove
                                                                                 );
-                                                                            } catch {}
-                                                                            window.removeEventListener(
-                                                                                "pointermove",
-                                                                                onPointerMove
-                                                                            );
-                                                                            window.removeEventListener("pointerup", onPointerUp);
-                                                                            resizingRef.current = null;
-                                                                        };
+                                                                                window.removeEventListener("pointerup", onPointerUp);
+                                                                                resizingRef.current = null;
+                                                                            };
 
-                                                                        window.addEventListener("pointermove", onPointerMove);
-                                                                        window.addEventListener("pointerup", onPointerUp);
-                                                                    }}
-                                                                />
-                                                            )}
-                                                            <button
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                removeTextBox(tb.id);
-                                                            }}
-                                                            style={{
-                                                                position: "absolute",
-                                                                right: -10,
-                                                                top: -10,
-                                                                width: 20,
-                                                                height: 20,
-                                                                borderRadius: 10,
-                                                                background: "#ef4444",
-                                                                color: "#fff",
-                                                                border: "none",
-                                                                cursor: "pointer",
-                                                                display: "flex",
-                                                                alignItems: "center",
-                                                                justifyContent: "center",
-                                                                fontSize: 12,
-                                                                zIndex: 20,
-                                                            }}
-                                                        >
-                                                            ×
-                                                        </button>
-                                                        </>
-                                                    )}
+                                                                            window.addEventListener("pointermove", onPointerMove);
+                                                                            window.addEventListener("pointerup", onPointerUp);
+                                                                        }}
+                                                                    />
+                                                                )}
+                                                                <button
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    removeTextBox(tb.id);
+                                                                }}
+                                                                style={{
+                                                                    position: "absolute",
+                                                                    right: -10,
+                                                                    top: -10,
+                                                                    width: 20,
+                                                                    height: 20,
+                                                                    borderRadius: 10,
+                                                                    background: "#ef4444",
+                                                                    color: "#fff",
+                                                                    border: "none",
+                                                                    cursor: "pointer",
+                                                                    display: "flex",
+                                                                    alignItems: "center",
+                                                                    justifyContent: "center",
+                                                                    fontSize: 12,
+                                                                    zIndex: 20,
+                                                                }}
+                                                            >
+                                                                ×
+                                                            </button>
+                                                            </>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         })}

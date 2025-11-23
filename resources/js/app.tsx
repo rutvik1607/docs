@@ -7,7 +7,7 @@ import { pdfjs } from "react-pdf";
 import PdfViewer from "../components/PDFViewer";
 import RightSidebar from "../components/RightSidebar";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { uploadPdf } from "./api/api";
+import { uploadPdf, saveFieldAssignments } from "./api/api";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
@@ -29,6 +29,14 @@ const App = () => {
         fieldType?: string;
         width?: number;
         height?: number;
+        recipientId?: number | null;
+    }
+
+    interface Recipient {
+        id: number;
+        first_name: string;
+        last_name: string;
+        email: string;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -38,6 +46,8 @@ const App = () => {
     const [fileName, setFileName] = React.useState<string>("testing.pdf");
     const [numPages, setNumPages] = React.useState<number>(0);
     const [reciepentModal, setReciepentModal] = useState(false)
+    const [isAssignmentMode, setIsAssignmentMode] = useState(false);
+    const [recipients, setRecipients] = React.useState<Recipient[]>([]);
 
     const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
     const rightSidebarRef = useRef<any>(null);
@@ -127,7 +137,37 @@ const App = () => {
             toast.warning("PDF not found.");
             return;
         }
+
+        if (textBoxes.length === 0) {
+            toast.warning("No fields to save.");
+            return;
+        }
+
+        if (recipients.length === 0) {
+            toast.warning("No recipients available. Please add recipients first.");
+            return;
+        }
+
+        setIsAssignmentMode(true);
+    };
+
+    const handleCompleteAssignment = async () => {
+        const unassignedFields = textBoxes.filter(tb => !tb.recipientId);
+        if (unassignedFields.length > 0) {
+            toast.warning(`Please assign recipients to all ${unassignedFields.length} field(s).`);
+            return;
+        }
+
+        setIsAssignmentMode(false);
+
+        if (!pdfUrl) {
+            toast.warning("PDF not found.");
+            return;
+        }
+
         try {
+            await saveFieldAssignments(1, 1, textBoxes);
+            
             const response = await fetch(pdfUrl);
             const arrayBuffer = await response.arrayBuffer();
             const pdfDoc = await PDFDocument.load(arrayBuffer);
@@ -152,11 +192,27 @@ const App = () => {
 
             const result = await uploadPdf(formData);
 
-            toast.success(`PDF saved successfully.`);
+            toast.success(`PDF and field assignments saved successfully.`);
         } catch (error) {
             console.error(error);
             toast.error("Error while saving PDF to server.");
         }
+    };
+
+    const handleCancelAssignment = () => {
+        setIsAssignmentMode(false);
+    };
+
+    const handleUpdateRecipients = (newRecipients: Recipient[]) => {
+        setRecipients(newRecipients);
+    };
+
+    const handleUpdateFieldRecipient = (textBoxId: string, recipientId: number | null) => {
+        setTextBoxes((prev) =>
+            prev.map((tb) =>
+                tb.id === textBoxId ? { ...tb, recipientId } : tb
+            )
+        );
     };
 
 
@@ -181,15 +237,136 @@ const App = () => {
                                     setSelectedTextBoxId={setSelectedTextBoxId}
                                     selectedTextBoxId={selectedTextBoxId}
                                     onDocumentLoadSuccess={(pdf) => setNumPages(pdf.numPages)}
+                                    isAssignmentMode={isAssignmentMode}
+                                    recipients={recipients}
+                                    onUpdateTextBox={handleUpdateFieldRecipient}
                                 />
                             </div>
+                            {isAssignmentMode && (
+                                <div className="assignment-mode-footer">
+                                    <div className="assignment-info">
+                                        <span className="assignment-title">Assign Recipients to All Fields</span>
+                                        <span className="assignment-count">
+                                            {textBoxes.filter(tb => tb.recipientId).length} of {textBoxes.length} assigned
+                                        </span>
+                                    </div>
+                                    <div className="assignment-actions">
+                                        <button
+                                            className="assignment-btn assignment-cancel"
+                                            onClick={handleCancelAssignment}
+                                        >
+                                            Cancel
+                                        </button>
+                                        <button
+                                            className="assignment-btn assignment-confirm"
+                                            onClick={handleCompleteAssignment}
+                                        >
+                                            Save PDF
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         </>
                     ) : (
                         <p>Loading PDF from storage...</p>
                     )}
                 </div>
-                <RightSidebar ref={rightSidebarRef} onSave={handleSaveToServer} setReciepentModal={setReciepentModal} templateId={1} />
+                <RightSidebar ref={rightSidebarRef} onSave={handleSaveToServer} setReciepentModal={setReciepentModal} templateId={1} onRecipientUpdate={handleUpdateRecipients} />
             </div>
+            <style>{`
+                .assignment-mode-footer {
+                    position: fixed;
+                    bottom: 0;
+                    left: 0;
+                    right: 0;
+                    background: white;
+                    border-top: 2px solid #49806e;
+                    padding: 16px 24px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+                    z-index: 100;
+                }
+
+                .assignment-info {
+                    display: flex;
+                    align-items: center;
+                    gap: 24px;
+                }
+
+                .assignment-title {
+                    font-weight: 600;
+                    font-size: 16px;
+                    color: #333;
+                }
+
+                .assignment-count {
+                    font-size: 14px;
+                    color: #666;
+                    background: #f0f0f0;
+                    padding: 4px 12px;
+                    border-radius: 12px;
+                }
+
+                .assignment-actions {
+                    display: flex;
+                    gap: 12px;
+                }
+
+                .assignment-btn {
+                    padding: 8px 20px;
+                    border-radius: 4px;
+                    border: none;
+                    font-weight: 600;
+                    cursor: pointer;
+                    font-size: 14px;
+                    transition: all 0.2s ease-in-out;
+                }
+
+                .assignment-cancel {
+                    background: #f0f0f0;
+                    color: #333;
+                }
+
+                .assignment-cancel:hover {
+                    background: #e0e0e0;
+                }
+
+                .assignment-confirm {
+                    background: #49806e;
+                    color: white;
+                }
+
+                .assignment-confirm:hover {
+                    background: #3a6657;
+                }
+
+                .document-canvas {
+                    padding-bottom: 80px;
+                }
+
+                @media (max-width: 768px) {
+                    .assignment-mode-footer {
+                        flex-direction: column;
+                        gap: 12px;
+                    }
+
+                    .assignment-info {
+                        flex-direction: column;
+                        gap: 8px;
+                        width: 100%;
+                    }
+
+                    .assignment-actions {
+                        width: 100%;
+                    }
+
+                    .assignment-btn {
+                        flex: 1;
+                    }
+                }
+            `}</style>
         </div>
     );
 };

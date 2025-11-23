@@ -17,3 +17,4 @@ Route::post('search-recipient', [RecipientController::class, 'searchRecipient'])
 Route::post('share-recipient', [RecipientController::class, 'shareRecipient']);
 Route::post('update-template', [RecipientController::class, 'updateTemplate']);
 Route::post('delete-recipient', [RecipientController::class, 'deleteRecipient']);
+Route::post('save-field-assignments', [RecipientController::class, 'saveFieldAssignments']);
