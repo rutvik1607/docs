@@ -491,7 +491,35 @@ body {
   margin-top: auto;
 }
 
+.rs-recipients-btns {
+  display: flex;
+  gap: 8px;
+}
+
 .rs-download-btn {
+  width: 100%;
+  border: 1px solid #c7e8df; /* soft teal border */
+  background: #eaf6f2; /* light greenish */
+  border-radius: 6px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  outline: none;
+  color: #2f7d6f; /* dark teal text */
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: background 0.15s ease;
+}
+
+.rs-download-btn:hover {
+  background: #b2d3c8;
+  color: #2f7d6f;
+}
+
+.rs-reciepent-btn {
   width: 100%;
   border: 1px solid #c7e8df; /* soft teal border */
   background: #b2d3c8; /* light greenish */
@@ -508,9 +536,46 @@ body {
   transition: background 0.15s ease;
 }
 
-.rs-download-btn:hover {
+.rs-reciepent-btn:hover {
   background: #d4e9e2;
   color: #2f7d6f;
+}
+
+.rs-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.rs-title {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #333;
+}
+
+.rs-header-add-recipient-btn {
+    background: #eaf6f2;
+    border: 1px solid #c7e8df;
+    padding: 8px;
+    cursor: pointer;
+    color: #2f7d6f;
+    transition: color 0.2s ease-in-out;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+}
+
+.rs-header-add-recipient-btn:hover {
+    color: #2f7d6f;
+    background: #b2d3c8;
+}
+
+.rs-header-add-recipient-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 /* Grid of buttons */
@@ -681,6 +746,181 @@ body {
   border-radius: 8px;
   font-weight: 500;
 }
+
+.rs-recipients-section {
+          border-top: 1px solid #ddd;
+          padding: 12px 0;
+          margin-bottom: 16px;
+        }
+
+        .rs-recipients-title {
+          font-size: 12px;
+          font-weight: 700;
+          color: #666;
+          margin: 0 0 8px 0;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+        }
+
+        .rs-recipients-list {
+          overflow-y: auto;
+        }
+
+        .rs-recipient-item {
+          /* padding: 8px 8px; */
+          border-radius: 3px;
+          cursor: pointer;
+          background: #efefef;
+          margin-bottom: 6px;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          transition: background 0.15s ease;
+        }
+
+        .rs-recipient-item:hover {
+          background: #e0e0e0;
+        }
+
+        .rs-recipient-info {
+          flex: 1;
+          padding: 8px;
+          min-width: 0;
+        }
+
+        .rs-recipient-name {
+          font-size: 14px;
+          font-weight: 600;
+          color: #333;
+          margin-bottom: 2px;
+        }
+
+        .rs-recipient-email {
+          font-size: 12px;
+          color: #888;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        .rs-recipient-delete-btn {
+          background: none;
+          border: none;
+          cursor: pointer;
+          color: #888;
+          padding: 14px 6px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 3px;
+          transition: color 0.15s ease, background 0.15s ease;
+          opacity: 0;
+          margin-left: 8px;
+          flex-shrink: 0;
+        }
+
+        .rs-recipient-item:hover .rs-recipient-delete-btn {
+          opacity: 1;
+        }
+        
+        .rs-recipient-delete-btn:hover {
+          color: #d32f2f;
+          background: #ffebee;
+        }
+
+        /* Delete Confirmation Modal */
+        .rs-confirm-modal-overlay {
+          position: fixed;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          background: rgba(0, 0, 0, 0.4);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          z-index: 1000;
+        }
+
+        .rs-confirm-confirmation-modal {
+          background: white;
+          border-radius: 8px;
+          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+          width: 90%;
+          max-width: 400px;
+          overflow: hidden;
+        }
+
+        .rs-confirm-modal-header {
+          border-bottom: 1px solid #e8eaed;
+          padding: 16px 24px;
+        }
+
+        .rs-confirm-modal-title {
+          font-size: 18px;
+          font-weight: 500;
+          color: #202124;
+          margin: 0;
+        }
+
+        .rs-confirm-modal-body {
+          padding: 16px 24px;
+        }
+
+        .rs-confirm-modal-body p {
+          font-size: 14px;
+          color: #202124;
+          margin: 0 0 8px 0;
+          line-height: 1.5;
+        }
+
+        .rs-confirm-modal-warning {
+          color: #d32f2f;
+          font-size: 13px;
+          margin-top: 12px !important;
+        }
+
+        .rs-confirm-modal-footer {
+          border-top: 1px solid #e8eaed;
+          padding: 12px 24px;
+          display: flex;
+          justify-content: flex-end;
+          gap: 8px;
+        }
+
+        .rs-confirm-modal-btn {
+          padding: 8px 16px;
+          border-radius: 4px;
+          border: none;
+          font-size: 14px;
+          font-weight: 500;
+          cursor: pointer;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+
+        .rs-confirm-modal-btn:disabled {
+          opacity: 0.6;
+          cursor: not-allowed;
+        }
+
+        .rs-confirm-modal-btn-cancel {
+          background: #f1f3f4;
+          color: #202124;
+          border: 1px solid #dadce0;
+        }
+
+        .rs-confirm-modal-btn-cancel:hover:not(:disabled) {
+          background: #e8eaed;
+        }
+
+        .rs-confirm-modal-btn-delete {
+          background: #d32f2f;
+          color: white;
+        }
+
+        .rs-confirm-modal-btn-delete:hover:not(:disabled) {
+          background: #b71c1c;
+        }
 
 /* Responsive Design */
 @media (max-width: 768px) {

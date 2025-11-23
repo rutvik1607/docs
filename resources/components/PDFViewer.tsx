@@ -23,6 +23,7 @@ interface PdfViewerProps {
     setSelectedTextBoxId: (id: string) => void;
     selectedTextBoxId: string | null;
     onDocumentLoadSuccess?: (pdf: any) => void;
+    updateTextBox: (id: string, content: string) => void;
 }
 
 export default function PdfViewer({

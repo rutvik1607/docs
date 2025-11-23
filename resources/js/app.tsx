@@ -2,7 +2,7 @@ import "./bootstrap";
 import "../css/app.css";
 
 import ReactDOM from "react-dom/client";
-import React from "react";
+import React, { useState, useRef } from "react";
 import { pdfjs } from "react-pdf";
 import PdfViewer from "../components/PDFViewer";
 import RightSidebar from "../components/RightSidebar";
@@ -12,6 +12,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import { useParams, useLocation, BrowserRouter } from "react-router-dom";
+import RecipientModal from "../components/Reciepents";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -36,8 +37,10 @@ const App = () => {
     const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
     const [fileName, setFileName] = React.useState<string>("testing.pdf");
     const [numPages, setNumPages] = React.useState<number>(0);
+    const [reciepentModal, setReciepentModal] = useState(false)
 
     const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
+    const rightSidebarRef = useRef<any>(null);
 
     const location = useLocation();
     const { fileName1 } = useParams();
@@ -113,6 +116,12 @@ const App = () => {
         return `{{ ${content?.trim() || ""} }}`;
     };
 
+    const handleRecipientCreated = async () => {
+        if (rightSidebarRef.current) {
+            await rightSidebarRef.current.refreshRecipients();
+        }
+    };
+
     const handleSaveToServer = async () => {
         if (!pdfUrl) {
             toast.warning("PDF not found.");
@@ -155,7 +164,7 @@ const App = () => {
     return (
         <div className="app-container">
             <ToastContainer position="top-center" autoClose={3000} />
-
+            {reciepentModal && <RecipientModal onClose={()=>{setReciepentModal(false)}} onCreate={handleRecipientCreated} templateId={1} />}
             <div className="main-content">
                 <div className="left-panel">
                     {pdfUrl ? (
@@ -179,7 +188,7 @@ const App = () => {
                         <p>Loading PDF from storage...</p>
                     )}
                 </div>
-                <RightSidebar onSave={handleSaveToServer} />
+                <RightSidebar ref={rightSidebarRef} onSave={handleSaveToServer} setReciepentModal={setReciepentModal} templateId={1} />
             </div>
         </div>
     );

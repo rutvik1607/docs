@@ -35,6 +35,7 @@ class RecipientController extends Controller
                 ],
                 'phone' => ['nullable', 'regex:/^[0-9\-\+\(\)\s]{7,20}$/'],
                 'postal_code' => ['nullable', 'regex:/^[A-Za-z0-9\- ]{3,10}$/'],
+                'template_id' => 'required|integer',
             ]);
 
             if ($validator->fails()) {
@@ -51,15 +52,27 @@ class RecipientController extends Controller
             // MAIN LOGIC
             // ------------------------------
             $data = $request->all();
+            $templateId = $request->template_id;
+            $now = now();
 
-            $data['created_at'] = now();
-            $data['updated_at'] = now();
+            $data['created_at'] = $now;
+            $data['updated_at'] = $now;
             $data['created_by'] = 1;
             
             $recipientId = DB::table('recipients')->insertGetId($data);
 
             // Fetch the inserted data
             $recipient = DB::table('recipients')->where('id', $recipientId)->first();
+
+            // Add record to share_recipients table
+            DB::table('share_recipients')->insert([
+                'template_id' => $templateId,
+                'user_id' => 1,
+                'recipient_id' => $recipientId,
+                'date' => $now,
+                'created_at' => $now,
+                'updated_at' => $now
+            ]);
 
             // ------------------------------
             // SUCCESS RESPONSE
@@ -168,7 +181,7 @@ class RecipientController extends Controller
             $recipients = \DB::table('recipients')
                 ->where('created_by', $user)
                 ->where('status', '!=', 2)
-                ->select('first_name', 'last_name', 'email')
+                ->select('id','first_name', 'last_name', 'email')
                 ->where(function($query) use ($search) {
                     $query->where('first_name', 'LIKE', "%{$search}%")
                           ->orWhere('last_name', 'LIKE', "%{$search}%")
@@ -267,7 +280,7 @@ class RecipientController extends Controller
                     'template_id' => $templateId,
                     'user_id'  => $userId,
                     'recipient_id' => $rec->id,
-                    'link'   => $secureLink,
+                    // 'link'   => $secureLink,
                     'date'  => $now,
                     'created_at'  => $now,
                     'updated_at'  => $now
@@ -293,6 +306,49 @@ class RecipientController extends Controller
             // ---------------------------------
             // FAILED RESPONSE
             // ---------------------------------
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getRecipientsByTemplate(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'template_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $templateId = $request->template_id;
+            
+            $recipients = DB::table('share_recipients')
+                ->join('recipients', 'share_recipients.recipient_id', '=', 'recipients.id')
+                ->where('share_recipients.template_id', $templateId)
+                ->select('recipients.*', 'share_recipients.date')
+                ->orderBy('share_recipients.id', 'DESC')
+                ->get();
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Recipients fetched successfully',
+                'data'         => $recipients
+            ], 200);
+
+        } catch (Exception $e) {
+
             return response()->json([
                 'status'      => false,
                 'error_code'  => 5000,
@@ -404,6 +460,62 @@ class RecipientController extends Controller
                 'code'   => 500,
                 'message' => 'Something went wrong',
                 'error'   => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function deleteRecipient(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'template_id' => 'required|integer',
+                'user_id' => 'required|integer',
+                'recipient_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $shareRecipient = DB::table('share_recipients')
+                ->where('template_id', $request->template_id)
+                ->where('user_id', $request->user_id)
+                ->where('recipient_id', $request->recipient_id)
+                ->first();
+
+            if (!$shareRecipient) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 404,
+                    'message'     => 'Share recipient not found',
+                ], 404);
+            }
+
+            DB::table('share_recipients')
+                ->where('template_id', $request->template_id)
+                ->where('user_id', $request->user_id)
+                ->where('recipient_id', $request->recipient_id)
+                ->delete();
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Recipient deleted successfully',
+                'data'         => []
+            ], 200);
+
+        } catch (Exception $e) {
+
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
             ], 500);
         }
     }
