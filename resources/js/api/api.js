@@ -114,3 +114,46 @@ export const saveFieldAssignments = async (templateId, userId, fields) => {
         throw error;
     }
 };
+
+// Send share email to recipients
+export const sendShareEmail = async (recipientIds, templateId, userId) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/send-share-email`, {
+            recipient_ids: recipientIds,
+            template_id: templateId,
+            user_id: userId
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to send share emails:", error);
+        throw error;
+    }
+};
+
+// Save recipient field values (for shared documents)
+export const saveRecipientFieldValues = async (token, fields) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/save-recipient-field-values`, {
+            token: token,
+            fields: fields
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to save recipient field values:", error);
+        throw error;
+    }
+};
+
+// Get template data with shared recipient fields
+export const getTemplateData = async (templateId, userId) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/get-template-data`, {
+            template_id: templateId,
+            user_id: userId
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch template data:", error);
+        throw error;
+    }
+};

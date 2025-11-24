@@ -7,7 +7,7 @@ import { pdfjs } from "react-pdf";
 import PdfViewer from "../components/PDFViewer";
 import RightSidebar from "../components/RightSidebar";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
-import { uploadPdf, saveFieldAssignments } from "./api/api";
+import { uploadPdf, saveFieldAssignments, sendShareEmail, saveRecipientFieldValues, getTemplateData } from "./api/api";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
@@ -30,6 +30,8 @@ const App = () => {
         width?: number;
         height?: number;
         recipientId?: number | null;
+        imageUrl?: string;
+        imageData?: string;
     }
 
     interface Recipient {
@@ -48,6 +50,10 @@ const App = () => {
     const [reciepentModal, setReciepentModal] = useState(false)
     const [isAssignmentMode, setIsAssignmentMode] = useState(false);
     const [recipients, setRecipients] = React.useState<Recipient[]>([]);
+    const [isSharedDocument, setIsSharedDocument] = React.useState(false);
+    const [sharedToken, setSharedToken] = React.useState<string | null>(null);
+    const [isLoadingTemplateData, setIsLoadingTemplateData] = React.useState(false);
+    const [hasLoadedFromDatabase, setHasLoadedFromDatabase] = React.useState(false);
 
     const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
     const rightSidebarRef = useRef<any>(null);
@@ -57,6 +63,10 @@ const App = () => {
 
     console.log("File Name:", fileName1);
     console.log("Current Path:", location.pathname);
+    
+    // Check if this is a shared document page
+    const isSharedDocPage = location.pathname.startsWith('/document/');
+    
     React.useEffect(() => {
         if (!hasFetchedRef.current) {
             hasFetchedRef.current = true;
@@ -72,16 +82,182 @@ const App = () => {
 
             fetchS3Pdf();
         }
+        
         const storedPdfUrl = "/storage/upload/testing.pdf";
         setPdfUrl(storedPdfUrl);
-
-        // Load persisted textBoxes for this PDF
-        const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
-        const savedTextBoxes = localStorage.getItem(storageKey);
-        if (savedTextBoxes) {
-            setTextBoxes(JSON.parse(savedTextBoxes));
+        
+        // Check if this is a shared document with assigned fields
+        if (isSharedDocPage && typeof window !== 'undefined') {
+            setIsSharedDocument(true);
+            console.log("Detected shared document page:", location.pathname);
+            
+            // Function to get shared data from window or data attributes
+            const getSharedData = () => {
+                // Try window.sharedDocumentData first
+                if ((window as any).sharedDocumentData) {
+                    return (window as any).sharedDocumentData;
+                }
+                
+                // Fallback to data attributes
+                const appElement = document.getElementById('app');
+                if (appElement) {
+                    const assignedFieldsAttr = appElement.getAttribute('data-assigned-fields');
+                    if (assignedFieldsAttr) {
+                        try {
+                            return {
+                                token: appElement.getAttribute('data-token'),
+                                assignedFields: JSON.parse(assignedFieldsAttr),
+                                recipient: JSON.parse(appElement.getAttribute('data-recipient') || 'null'),
+                                template: JSON.parse(appElement.getAttribute('data-template') || 'null')
+                            };
+                        } catch (e) {
+                            console.error("Error parsing data attributes:", e);
+                        }
+                    }
+                }
+                
+                return null;
+            };
+            
+            // Wait a bit for window.sharedDocumentData to be available (script tag in body)
+            const checkSharedData = () => {
+                const sharedData = getSharedData();
+                console.log("Shared data:", sharedData);
+                
+                if (sharedData && sharedData.token) {
+                    setSharedToken(sharedData.token);
+                }
+                
+                if (sharedData && sharedData.assignedFields && Array.isArray(sharedData.assignedFields) && sharedData.assignedFields.length > 0) {
+                    // Convert assigned fields to TextBox format
+                    const fieldsAsTextBoxes: TextBox[] = sharedData.assignedFields.map((field: any) => {
+                        const textBox: TextBox = {
+                            id: field.id || `field-${Date.now()}-${Math.random()}`,
+                            page: field.page || 1,
+                            x: field.x || 0,
+                            y: field.y || 0,
+                            content: field.content || '',
+                            fieldType: field.fieldType || 'text',
+                            width: field.width,
+                            height: field.height,
+                            recipientId: null, // Fields are already assigned to this recipient
+                            imageData: field.imageData // Include imageData directly in textBox
+                        };
+                        
+                        // Also store in localStorage as fallback for the PDFViewer to access
+                        if (field.imageData && (field.fieldType === 'signature' || field.fieldType === 'stamp')) {
+                            const imageKey = `pdf-image-${storedPdfUrl}-${field.id}`;
+                            localStorage.setItem(imageKey, field.imageData);
+                        }
+                        
+                        return textBox;
+                    });
+                    
+                    console.log("Loading assigned fields from shared document:", fieldsAsTextBoxes);
+                    setTextBoxes(fieldsAsTextBoxes);
+                } else {
+                    console.log("No assigned fields found, loading from localStorage");
+                    // No assigned fields, load from localStorage if available
+                    const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
+                    const savedTextBoxes = localStorage.getItem(storageKey);
+                    if (savedTextBoxes) {
+                        setTextBoxes(JSON.parse(savedTextBoxes));
+                    }
+                }
+            };
+            
+            // Check immediately and also after a short delay to ensure script has loaded
+            checkSharedData();
+            setTimeout(checkSharedData, 100);
+        } else {
+            // Regular document view - load from database ONLY on initial load
+            const loadTemplateDataFromDatabase = async () => {
+                // Only load if we haven't loaded from database yet
+                if (hasLoadedFromDatabase) {
+                    console.log("Already loaded from database, skipping...");
+                    return;
+                }
+                
+                try {
+                    setIsLoadingTemplateData(true);
+                    console.log("Fetching template data from database (initial load)...");
+                    
+                    const response = await getTemplateData(1, 1); // template_id=1, user_id=1
+                    console.log("Template data response:", response);
+                    
+                    if (response.status && response.data && response.data.share_recipients) {
+                        // Collect all fields from all recipients
+                        const allFields: TextBox[] = [];
+                        
+                        response.data.share_recipients.forEach((recipient: any) => {
+                            if (recipient.fields && Array.isArray(recipient.fields)) {
+                                recipient.fields.forEach((field: any) => {
+                                    const textBox: TextBox = {
+                                        id: field.id || `field-${Date.now()}-${Math.random()}`,
+                                        page: field.page || 1,
+                                        x: field.x || 0,
+                                        y: field.y || 0,
+                                        content: field.content || '',
+                                        fieldType: field.fieldType || 'text',
+                                        width: field.width,
+                                        height: field.height,
+                                        recipientId: recipient.recipient_id,
+                                        imageData: field.imageData // Include imageData from database
+                                    };
+                                    
+                                    // If field has imageData, store it in localStorage as fallback
+                                    if (field.imageData && (field.fieldType === 'signature' || field.fieldType === 'stamp')) {
+                                        const imageKey = `pdf-image-${storedPdfUrl}-${field.id}`;
+                                        localStorage.setItem(imageKey, field.imageData);
+                                    }
+                                    
+                                    allFields.push(textBox);
+                                });
+                            }
+                        });
+                        
+                        if (allFields.length > 0) {
+                            console.log("Loaded fields from database:", allFields);
+                            setTextBoxes(allFields);
+                            setHasLoadedFromDatabase(true);
+                        } else {
+                            console.log("No fields in database, loading from localStorage");
+                            // Fallback to localStorage if no fields in database
+                            const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
+                            const savedTextBoxes = localStorage.getItem(storageKey);
+                            if (savedTextBoxes) {
+                                setTextBoxes(JSON.parse(savedTextBoxes));
+                            }
+                            setHasLoadedFromDatabase(true);
+                        }
+                    } else {
+                        console.log("No template data, loading from localStorage");
+                        // Fallback to localStorage
+                        const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
+                        const savedTextBoxes = localStorage.getItem(storageKey);
+                        if (savedTextBoxes) {
+                            setTextBoxes(JSON.parse(savedTextBoxes));
+                        }
+                        setHasLoadedFromDatabase(true);
+                    }
+                } catch (error) {
+                    console.error("Error loading template data:", error);
+                    // Fallback to localStorage on error
+                    const storageKey = `pdf-textBoxes-${storedPdfUrl}`;
+                    const savedTextBoxes = localStorage.getItem(storageKey);
+                    if (savedTextBoxes) {
+                        setTextBoxes(JSON.parse(savedTextBoxes));
+                    }
+                    setHasLoadedFromDatabase(true);
+                } finally {
+                    setIsLoadingTemplateData(false);
+                }
+            };
+            
+            // Load from database only once on initial mount
+            loadTemplateDataFromDatabase();
         }
-    }, []);
+    }, [isSharedDocument]);
 
     // Update ref with latest textBoxes
     React.useEffect(() => {
@@ -166,7 +342,23 @@ const App = () => {
         }
 
         try {
-            await saveFieldAssignments(1, 1, textBoxes);
+            // Prepare fields with imageData for signature/stamp fields
+            const fieldsWithImages = textBoxes.map(tb => {
+                const fieldData: any = { ...tb };
+                
+                // Include imageData for signature and stamp fields
+                if ((tb.fieldType === 'signature' || tb.fieldType === 'stamp')) {
+                    const imageKey = `pdf-image-${pdfUrl}-${tb.id}`;
+                    const imageData = localStorage.getItem(imageKey);
+                    if (imageData) {
+                        fieldData.imageData = imageData;
+                    }
+                }
+                
+                return fieldData;
+            });
+            
+            await saveFieldAssignments(1, 1, fieldsWithImages);
             
             const response = await fetch(pdfUrl);
             const arrayBuffer = await response.arrayBuffer();
@@ -192,7 +384,13 @@ const App = () => {
 
             const result = await uploadPdf(formData);
 
-            toast.success(`PDF and field assignments saved successfully.`);
+            const recipientIds = recipients.map(r => r.id);
+            if (recipientIds.length > 0) {
+                await sendShareEmail(recipientIds, 1, 1);
+                toast.success(`PDF saved and emails sent to recipients successfully.`);
+            } else {
+                toast.success(`PDF and field assignments saved successfully.`);
+            }
         } catch (error) {
             console.error(error);
             toast.error("Error while saving PDF to server.");
@@ -208,6 +406,10 @@ const App = () => {
     };
 
     const handleUpdateFieldRecipient = (textBoxId: string, recipientId: number | null) => {
+        // Don't allow recipient assignment in shared document view
+        if (isSharedDocument) {
+            return;
+        }
         setTextBoxes((prev) =>
             prev.map((tb) =>
                 tb.id === textBoxId ? { ...tb, recipientId } : tb
@@ -215,12 +417,56 @@ const App = () => {
         );
     };
 
+    const handleSubmitRecipientFields = async () => {
+        if (!sharedToken) {
+            toast.error("Invalid document link");
+            return;
+        }
 
+        if (!textBoxes || textBoxes.length === 0) {
+            toast.warning("No fields to save");
+            return;
+        }
+
+        try {
+            // Prepare fields data for API, including image data
+            const fieldsData = textBoxes.map(tb => {
+                const fieldData: any = {
+                    id: tb.id,
+                    content: tb.content || '',
+                    fieldType: tb.fieldType || 'text',
+                    page: tb.page,
+                    x: tb.x,
+                    y: tb.y,
+                    width: tb.width,
+                    height: tb.height
+                };
+                
+                // Include image data for signature and stamp fields
+                if ((tb.fieldType === 'signature' || tb.fieldType === 'stamp')) {
+                    const imageKey = `pdf-image-${pdfUrl}-${tb.id}`;
+                    const imageData = localStorage.getItem(imageKey);
+                    if (imageData) {
+                        fieldData.imageData = imageData;
+                    }
+                }
+                
+                return fieldData;
+            });
+
+            await saveRecipientFieldValues(sharedToken, fieldsData);
+            toast.success("Field values saved successfully!");
+        } catch (error: any) {
+            console.error("Error saving field values:", error);
+            toast.error(error.response?.data?.message || "Failed to save field values");
+        }
+    };
 
     return (
         <div className="app-container">
             <ToastContainer position="top-center" autoClose={3000} />
             {reciepentModal && <RecipientModal onClose={()=>{setReciepentModal(false)}} onCreate={handleRecipientCreated} templateId={1} />}
+            
             <div className="main-content">
                 <div className="left-panel">
                     {pdfUrl ? (
@@ -237,12 +483,31 @@ const App = () => {
                                     setSelectedTextBoxId={setSelectedTextBoxId}
                                     selectedTextBoxId={selectedTextBoxId}
                                     onDocumentLoadSuccess={(pdf) => setNumPages(pdf.numPages)}
-                                    isAssignmentMode={isAssignmentMode}
+                                    isAssignmentMode={isSharedDocument ? false : isAssignmentMode}
                                     recipients={recipients}
                                     onUpdateTextBox={handleUpdateFieldRecipient}
+                                    isSharedDocument={isSharedDocument}
                                 />
                             </div>
-                            {isAssignmentMode && (
+                            {isSharedDocument && (
+                                <div className="recipient-submit-footer">
+                                    <div className="recipient-info">
+                                        <span className="recipient-title">Fill in your assigned fields</span>
+                                        <span className="recipient-count">
+                                            {textBoxes.length} field(s) assigned to you
+                                        </span>
+                                    </div>
+                                    <div className="recipient-actions">
+                                        <button
+                                            className="recipient-submit-btn"
+                                            onClick={handleSubmitRecipientFields}
+                                        >
+                                            Submit
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {!isSharedDocument && isAssignmentMode && (
                                 <div className="assignment-mode-footer">
                                     <div className="assignment-info">
                                         <span className="assignment-title">Assign Recipients to All Fields</span>
@@ -271,101 +536,12 @@ const App = () => {
                         <p>Loading PDF from storage...</p>
                     )}
                 </div>
-                <RightSidebar ref={rightSidebarRef} onSave={handleSaveToServer} setReciepentModal={setReciepentModal} templateId={1} onRecipientUpdate={handleUpdateRecipients} />
+                {!isSharedDocument && (
+                    <RightSidebar ref={rightSidebarRef} onSave={handleSaveToServer} setReciepentModal={setReciepentModal} templateId={1} onRecipientUpdate={handleUpdateRecipients} />
+                )}
             </div>
             <style>{`
-                .assignment-mode-footer {
-                    position: fixed;
-                    bottom: 0;
-                    left: 0;
-                    right: 0;
-                    background: white;
-                    border-top: 2px solid #49806e;
-                    padding: 16px 24px;
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-                    z-index: 100;
-                }
-
-                .assignment-info {
-                    display: flex;
-                    align-items: center;
-                    gap: 24px;
-                }
-
-                .assignment-title {
-                    font-weight: 600;
-                    font-size: 16px;
-                    color: #333;
-                }
-
-                .assignment-count {
-                    font-size: 14px;
-                    color: #666;
-                    background: #f0f0f0;
-                    padding: 4px 12px;
-                    border-radius: 12px;
-                }
-
-                .assignment-actions {
-                    display: flex;
-                    gap: 12px;
-                }
-
-                .assignment-btn {
-                    padding: 8px 20px;
-                    border-radius: 4px;
-                    border: none;
-                    font-weight: 600;
-                    cursor: pointer;
-                    font-size: 14px;
-                    transition: all 0.2s ease-in-out;
-                }
-
-                .assignment-cancel {
-                    background: #f0f0f0;
-                    color: #333;
-                }
-
-                .assignment-cancel:hover {
-                    background: #e0e0e0;
-                }
-
-                .assignment-confirm {
-                    background: #49806e;
-                    color: white;
-                }
-
-                .assignment-confirm:hover {
-                    background: #3a6657;
-                }
-
-                .document-canvas {
-                    padding-bottom: 80px;
-                }
-
-                @media (max-width: 768px) {
-                    .assignment-mode-footer {
-                        flex-direction: column;
-                        gap: 12px;
-                    }
-
-                    .assignment-info {
-                        flex-direction: column;
-                        gap: 8px;
-                        width: 100%;
-                    }
-
-                    .assignment-actions {
-                        width: 100%;
-                    }
-
-                    .assignment-btn {
-                        flex: 1;
-                    }
-                }
+                
             `}</style>
         </div>
     );

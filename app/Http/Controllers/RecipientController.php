@@ -241,9 +241,38 @@ class RecipientController extends Controller
             $recipientIds = $request->recipient_ids;
             $userId       = $request->user_id;
             $templateId   = $request->template_id;
-            $user   = [];
             $insertData = [];
             $now = now();
+
+            // ----------------------------------
+            // GET DOCUMENT NAME (from request or use default)
+            // ----------------------------------
+            $documentName = $request->document_name ?? $request->file_name ?? 'Document';
+
+            // ----------------------------------
+            // GET SENDER RECIPIENT DATA (sender is a recipient with id = user_id)
+            // ----------------------------------
+            $senderRecipient = DB::table('recipients')
+                ->where('id', $userId)
+                ->where('status', 1)
+                ->select('id', 'first_name', 'last_name', 'email')
+                ->first();
+
+            if (!$senderRecipient) {
+                return response()->json([
+                    'status'     => false,
+                    'error_code' => 404,
+                    'message'    => 'Sender recipient not found'
+                ], 404);
+            }
+
+            // Create sender object with full name
+            $senderName = trim(($senderRecipient->first_name ?? '') . ' ' . ($senderRecipient->last_name ?? ''));
+            $sender = (object)[
+                'id' => $senderRecipient->id,
+                'name' => $senderName ?: 'Someone',
+                'email' => $senderRecipient->email
+            ];
 
             // ----------------------------------
             // CHECK — recipients belong to user
@@ -252,7 +281,7 @@ class RecipientController extends Controller
                 ->whereIn('id', $recipientIds)
                 ->where('created_by', $userId)
                 ->where('status', 1)
-                ->select('id', 'email', 'first_name')
+                ->select('id', 'email', 'first_name', 'last_name')
                 ->get();
 
             if (count($recipients) != count($recipientIds)) {
@@ -265,28 +294,29 @@ class RecipientController extends Controller
 
             foreach ($recipients as $rec) {
 
-                $payload = [
-                    'recipient_id' => $rec->id,
-                    'email'        => $rec->email,
-                    'template_id'  => $templateId,
-                    'timestamp'    => time()
-                ];
+                // Generate unique UUID token for each recipient
+                $token = Str::uuid()->toString();
 
-                $encryptedString = encrypt(json_encode($payload));
-
-                $secureLink = route('shared.document.link', $encryptedString);
+                // Create link using UUID token
+                $secureLink = route('shared.document.link', $token);
                 
                 $insertData[] = [
                     'template_id' => $templateId,
                     'user_id'  => $userId,
                     'recipient_id' => $rec->id,
-                    // 'link'   => $secureLink,
+                    'token' => $token,
                     'date'  => $now,
                     'created_at'  => $now,
                     'updated_at'  => $now
                 ];
 
-                Mail::to($rec->email)->send(new ShareRecipientMail($user, $rec, $secureLink));
+                $recipientData = (object)[
+                    'id' => $rec->id,
+                    'email' => $rec->email,
+                    'first_name' => $rec->first_name
+                ];
+
+                Mail::to($rec->email)->send(new ShareRecipientMail($sender, $recipientData, $secureLink, $documentName));
             }
 
             DB::table('share_recipients')->insert($insertData);
@@ -358,41 +388,148 @@ class RecipientController extends Controller
         }
     }
 
-    public function openDocument($encrypted)
+    public function openDocument($token)
     {
         try {
-            $payload = json_decode(decrypt($encrypted), true);
+            // Find share_recipient record by token
+            $shareRecipient = DB::table('share_recipients')
+                ->where('token', $token)
+                ->first();
 
-            // Check data integrity
-            if (!$payload || !isset($payload['recipient_id']) || !isset($payload['email'])) {
+            if (!$shareRecipient) {
                 return "Invalid or expired link";
             }
 
             // Validate recipient still exists
             $recipient = DB::table('recipients')
-                ->where('id', $payload['recipient_id'])
-                ->where('email', $payload['email'])
+                ->where('id', $shareRecipient->recipient_id)
+                ->where('status', 1)
                 ->first();
 
             if (!$recipient) {
                 return "Invalid user";
             }
 
-            $template = [];
-            // Fetch template data
-            // $template = DB::table('templates')->where('id', $payload['template_id'])->first();
+            // Get assigned fields from field_json
+            $assignedFields = [];
+            if (!empty($shareRecipient->field_json)) {
+                $assignedFields = json_decode($shareRecipient->field_json, true);
+                if (!is_array($assignedFields)) {
+                    $assignedFields = [];
+                }
+            }
 
-            // if (!$template) {
-            //     return "Template not found";
-            // }
+            $template = [];
+            // Fetch template data if needed
+            // $template = DB::table('templates')->where('id', $shareRecipient->template_id)->first();
 
             return view('open-document', [
                 'recipient' => $recipient,
-                'template'  => $template
+                'template'  => $template,
+                'token' => $token,
+                'assignedFields' => $assignedFields
             ]);
 
         } catch (\Throwable $e) {
             return "Link Invalid or Tampered";
+        }
+    }
+
+    public function saveRecipientFieldValues(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'token' => 'required|string',
+                'fields' => 'required|array',
+                'fields.*.id' => 'required|string',
+                'fields.*.content' => 'required|string',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $token = $request->token;
+            $fields = $request->fields;
+
+            // Find share_recipient record by token
+            $shareRecipient = DB::table('share_recipients')
+                ->where('token', $token)
+                ->first();
+
+            if (!$shareRecipient) {
+                return response()->json([
+                    'status'     => false,
+                    'error_code' => 404,
+                    'message'    => 'Invalid token or link expired'
+                ], 404);
+            }
+
+            // Get existing field_json
+            $existingFields = [];
+            if (!empty($shareRecipient->field_json)) {
+                $existingFields = json_decode($shareRecipient->field_json, true);
+                if (!is_array($existingFields)) {
+                    $existingFields = [];
+                }
+            }
+
+            // Update field values with recipient-entered content and imageData
+            $updatedFields = [];
+            foreach ($existingFields as $existingField) {
+                $fieldId = $existingField['id'] ?? null;
+                // Find matching field from request
+                $matchingField = null;
+                foreach ($fields as $field) {
+                    if (isset($field['id']) && $field['id'] === $fieldId) {
+                        $matchingField = $field;
+                        break;
+                    }
+                }
+                
+                if ($matchingField) {
+                    // Update content with recipient's entered value
+                    if (isset($matchingField['content'])) {
+                        $existingField['content'] = $matchingField['content'];
+                    }
+                    
+                    // Update imageData for signature/stamp fields
+                    if (isset($matchingField['imageData'])) {
+                        $existingField['imageData'] = $matchingField['imageData'];
+                    }
+                }
+                $updatedFields[] = $existingField;
+            }
+
+            // Update field_json with new values
+            DB::table('share_recipients')
+                ->where('token', $token)
+                ->update([
+                    'field_json' => json_encode($updatedFields),
+                    'updated_at' => now(),
+                ]);
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Field values saved successfully',
+                'data'         => [
+                    'updated_fields' => count($updatedFields)
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
         }
     }
 
@@ -534,6 +671,9 @@ class RecipientController extends Controller
                 'fields.*.page' => 'required|integer',
                 'fields.*.x' => 'required|numeric',
                 'fields.*.y' => 'required|numeric',
+                'fields.*.width' => 'nullable|numeric',
+                'fields.*.height' => 'nullable|numeric',
+                'fields.*.imageData' => 'nullable|string',
             ]);
 
             if ($validator->fails()) {
@@ -555,7 +695,8 @@ class RecipientController extends Controller
                 if (!isset($groupedByRecipient[$recipientId])) {
                     $groupedByRecipient[$recipientId] = [];
                 }
-                $groupedByRecipient[$recipientId][] = [
+                
+                $fieldData = [
                     'id' => $field['id'],
                     'content' => $field['content'],
                     'fieldType' => $field['fieldType'] ?? 'text',
@@ -563,6 +704,21 @@ class RecipientController extends Controller
                     'x' => $field['x'],
                     'y' => $field['y'],
                 ];
+                
+                // Include width and height if provided
+                if (isset($field['width'])) {
+                    $fieldData['width'] = $field['width'];
+                }
+                if (isset($field['height'])) {
+                    $fieldData['height'] = $field['height'];
+                }
+                
+                // Include imageData for signature/stamp fields
+                if (isset($field['imageData'])) {
+                    $fieldData['imageData'] = $field['imageData'];
+                }
+                
+                $groupedByRecipient[$recipientId][] = $fieldData;
             }
 
             $updated = [];
@@ -588,6 +744,241 @@ class RecipientController extends Controller
 
         } catch (Exception $e) {
 
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function sendShareEmail(Request $request)
+    {
+        try {
+
+            $validator = Validator::make($request->all(), [
+                'recipient_ids'   => 'required|array|min:1',
+                'recipient_ids.*' => 'required|integer|exists:recipients,id',
+                'template_id' => 'required|integer',
+                'user_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $recipientIds = $request->recipient_ids;
+            $userId       = $request->user_id;
+            $templateId   = $request->template_id;
+
+            // ----------------------------------
+            // GET DOCUMENT NAME (from request or use default)
+            // ----------------------------------
+            $documentName = $request->document_name ?? $request->file_name ?? 'Document';
+
+            // ----------------------------------
+            // GET SENDER RECIPIENT DATA (sender is a recipient with id = user_id)
+            // ----------------------------------
+            $senderRecipient = DB::table('recipients')
+                ->where('id', $userId)
+                ->where('status', 1)
+                ->select('id', 'first_name', 'last_name', 'email')
+                ->first();
+
+            if (!$senderRecipient) {
+                return response()->json([
+                    'status'     => false,
+                    'error_code' => 404,
+                    'message'    => 'Sender recipient not found'
+                ], 404);
+            }
+
+            // Create sender object with full name
+            $senderName = trim(($senderRecipient->first_name ?? '') . ' ' . ($senderRecipient->last_name ?? ''));
+            $sender = (object)[
+                'id' => $senderRecipient->id,
+                'name' => $senderName ?: 'Someone',
+                'email' => $senderRecipient->email
+            ];
+
+            // ----------------------------------
+            // GET RECIPIENTS (receivers)
+            // ----------------------------------
+            $recipients = DB::table('recipients')
+                ->whereIn('id', $recipientIds)
+                ->where('created_by', $userId)
+                ->where('status', 1)
+                ->select('id', 'email', 'first_name', 'last_name')
+                ->get();
+
+            if (count($recipients) != count($recipientIds)) {
+                return response()->json([
+                    'status'     => false,
+                    'error_code' => 403,
+                    'message'    => 'One or more recipients do not belong to this user'
+                ], 403);
+            }
+
+            $emailsSent = 0;
+            foreach ($recipients as $rec) {
+
+                // Generate unique UUID token for each recipient
+                $token = Str::uuid()->toString();
+
+                // Create link using UUID token
+                $secureLink = route('shared.document.link', $token);
+
+                // Store token in share_recipients table
+                $exists = DB::table('share_recipients')
+                    ->where('template_id', $templateId)
+                    ->where('user_id', $userId)
+                    ->where('recipient_id', $rec->id)
+                    ->exists();
+
+                if ($exists) {
+                    // Update existing record with new token
+                    DB::table('share_recipients')
+                        ->where('template_id', $templateId)
+                        ->where('user_id', $userId)
+                        ->where('recipient_id', $rec->id)
+                        ->update([
+                            'token' => $token,
+                            'updated_at' => now()
+                        ]);
+                } else {
+                    // Insert new record with token
+                    DB::table('share_recipients')
+                        ->insert([
+                            'template_id' => $templateId,
+                            'user_id' => $userId,
+                            'recipient_id' => $rec->id,
+                            'token' => $token,
+                            'date' => now(),
+                            'created_at' => now(),
+                            'updated_at' => now()
+                        ]);
+                }
+
+                $recipientData = (object)[
+                    'id' => $rec->id,
+                    'email' => $rec->email,
+                    'first_name' => $rec->first_name
+                ];
+
+                try {
+                    Mail::to($rec->email)->send(new ShareRecipientMail($sender, $recipientData, $secureLink, $documentName));
+                    $emailsSent++;
+                } catch (Exception $e) {
+                    \Log::error('Failed to send email to ' . $rec->email . ': ' . $e->getMessage());
+                }
+            }
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Emails sent successfully',
+                'data'         => [
+                    'emails_sent' => $emailsSent,
+                    'total_recipients' => count($recipients)
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
+
+            return response()->json([
+                'status'      => false,
+                'error_code'  => 5000,
+                'message'     => 'Something went wrong',
+                'error'       => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    public function getTemplateData(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'template_id' => 'required|integer',
+                'user_id' => 'required|integer',
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'status'      => false,
+                    'error_code'  => 422,
+                    'message'     => 'Validation failed',
+                    'errors'      => $validator->errors(),
+                ], 422);
+            }
+
+            $templateId = $request->template_id;
+            $userId = $request->user_id;
+
+            // Get all share_recipients for this template and user
+            $shareRecipients = DB::table('share_recipients')
+                ->join('recipients', 'share_recipients.recipient_id', '=', 'recipients.id')
+                ->where('share_recipients.template_id', $templateId)
+                ->where('share_recipients.user_id', $userId)
+                ->where('recipients.status', 1)
+                ->select(
+                    'share_recipients.*',
+                    'recipients.first_name',
+                    'recipients.last_name',
+                    'recipients.email'
+                )
+                ->orderBy('share_recipients.id', 'DESC')
+                ->get();
+
+            // Format the data
+            $formattedData = $shareRecipients->map(function($item) {
+                $fields = [];
+                if (!empty($item->field_json)) {
+                    $fields = json_decode($item->field_json, true);
+                    if (!is_array($fields)) {
+                        $fields = [];
+                    }
+                }
+
+                // Generate link from token if token exists
+                $link = null;
+                if (!empty($item->token)) {
+                    $link = route('shared.document.link', $item->token);
+                }
+
+                return [
+                    'id' => $item->id,
+                    'template_id' => $item->template_id,
+                    'recipient_id' => $item->recipient_id,
+                    'recipient_name' => trim(($item->first_name ?? '') . ' ' . ($item->last_name ?? '')),
+                    'recipient_email' => $item->email ?? '',
+                    'fields' => $fields,
+                    'token' => $item->token ?? null,
+                    'link' => $link,
+                    'date' => $item->date ?? null,
+                    'created_at' => $item->created_at ?? null,
+                    'updated_at' => $item->updated_at ?? null,
+                ];
+            });
+
+            return response()->json([
+                'status'       => true,
+                'success_code' => 2000,
+                'message'      => 'Template data fetched successfully',
+                'data'         => [
+                    'template_id' => $templateId,
+                    'user_id' => $userId,
+                    'share_recipients' => $formattedData,
+                    'total_recipients' => $formattedData->count()
+                ]
+            ], 200);
+
+        } catch (Exception $e) {
             return response()->json([
                 'status'      => false,
                 'error_code'  => 5000,

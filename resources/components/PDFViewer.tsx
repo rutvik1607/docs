@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Document, Page, pdfjs } from "react-pdf";
 import { useState, useRef, useEffect } from "react";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 interface TextBox {
     id: string;
@@ -12,6 +14,8 @@ interface TextBox {
     width?: number;
     height?: number;
     recipientId?: number | null;
+    imageUrl?: string;
+    imageData?: string;
 }
 
 interface Recipient {
@@ -35,6 +39,7 @@ interface PdfViewerProps {
     isAssignmentMode?: boolean;
     recipients?: Recipient[];
     onUpdateTextBox?: (id: string, recipientId: number | null) => void;
+    isSharedDocument?: boolean;
 }
 
 export default function PdfViewer({
@@ -47,14 +52,20 @@ export default function PdfViewer({
     setSelectedTextBoxId,
     selectedTextBoxId,
     onDocumentLoadSuccess,
+    updateTextBox,
     isAssignmentMode = false,
     recipients = [],
     onUpdateTextBox,
+    isSharedDocument = false,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [pageDims, setPageDims] = useState<{ width: number; height: number }[]>([]);
+    const [showDatePicker, setShowDatePicker] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+    const [uploadingImage, setUploadingImage] = useState<string | null>(null);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     const draggingRef = useRef<{
         id: string;
         page: number;
@@ -103,8 +114,79 @@ export default function PdfViewer({
         setLoadError(error);
     };
 
+    const handleImageUpload = (textBoxId: string, file: File) => {
+        if (!file.type.startsWith('image/')) {
+            alert('Please upload an image file');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const imageUrl = e.target?.result as string;
+            // Trigger a re-render by updating the textbox
+            // We'll store the imageUrl in localStorage and trigger updateTextBox
+            const textBox = textBoxes.find(tb => tb.id === textBoxId);
+            if (textBox) {
+                // Store image in a separate localStorage key for images
+                const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
+                localStorage.setItem(imageKey, imageUrl);
+                
+                // Also update the textBox with imageData for shared document persistence
+                const updatedTextBoxes = textBoxes.map(tb => 
+                    tb.id === textBoxId ? { ...tb, imageData: imageUrl } : tb
+                );
+                
+                // Trigger update to force re-render
+                updateTextBox(textBoxId, textBox.content);
+            }
+            setUploadingImage(null);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const triggerImageUpload = (textBoxId: string) => {
+        setUploadingImage(textBoxId);
+        if (fileInputRef.current) {
+            fileInputRef.current.click();
+        }
+    };
+
+    const removeImage = (textBoxId: string) => {
+        const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
+        localStorage.removeItem(imageKey);
+        const textBox = textBoxes.find(tb => tb.id === textBoxId);
+        if (textBox) {
+            updateTextBox(textBoxId, textBox.content);
+        }
+    };
+
+    const getImageUrl = (textBoxId: string): string | undefined => {
+        // First check if textBox has imageData property (from server/shared view)
+        const textBox = textBoxes.find(tb => tb.id === textBoxId);
+        if (textBox?.imageData) {
+            return textBox.imageData;
+        }
+        
+        // Fallback to localStorage for local editing
+        const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
+        return localStorage.getItem(imageKey) || undefined;
+    };
+
     return (
         <div ref={containerRef}>
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file && uploadingImage) {
+                        handleImageUpload(uploadingImage, file);
+                    }
+                    e.target.value = '';
+                }}
+            />
             <Document
                 file={fileUrl}
                 onLoadSuccess={handleDocumentLoadSuccess}
@@ -164,8 +246,25 @@ export default function PdfViewer({
                                         localStorage.setItem('globalTextBoxId', newIdNum.toString());
                                         const id = `tb_${newIdNum}`;
 
-                                        const width = fieldType === "billing" ? 180 : Math.max(60, content.length * 6 + 12);
-                                        const height = 30;
+                                        // Default dimensions per field type
+                                        let width = Math.max(60, content.length * 6 + 12);
+                                        let height = 30;
+                                        if (fieldType === "billing") {
+                                        width = width+40; // wider, resizable container for billing details
+                                        height = 36;
+                                        } else if (fieldType === "initials") {
+                                        width = width+42; // square-ish for initials
+                                        height = 36;
+                                        } else if (fieldType === "text") {
+                                        width = width+35; // square-ish for initials
+                                        height = 36;
+                                        } else if (fieldType === "signature") {
+                                        width = 200; // wider for signature
+                                        height = 80;
+                                        } else if (fieldType === "stamp") {
+                                        width = 120; // square-ish for stamp
+                                        height = 120;
+                                        }
 
                                         addTextBox({ id, page: pageNumber, x, y, content, fieldType, width, height });
                                     } catch (err) {
@@ -223,27 +322,36 @@ export default function PdfViewer({
                                                 setSelectedTextBoxId(tb.id);
 
                                                 const onPointerMove = (moveEv: PointerEvent) => {
-                                                    if (!draggingRef.current) return;
-                                                    const d = draggingRef.current;
-                                                    const pageIdx = d.page - 1;
-                                                    const pn =
-                                                        containerRef.current?.querySelectorAll(
-                                                            ".react-pdf__Page"
-                                                        )[pageIdx] as HTMLElement | undefined;
-                                                    if (!pn || !pageDims[pageIdx]) return;
-                                                    const rect = pn.getBoundingClientRect();
-                                                    const currentScale = pageDims[pageIdx]
-                                                        ? rect.width / pageDims[pageIdx].width
-                                                        : 1;
-                                                    const deltaX =
-                                                        (moveEv.clientX - d.startClientX) / currentScale;
-                                                    const deltaY =
-                                                        (moveEv.clientY - d.startClientY) / currentScale;
-                                                    const newX = d.origX + deltaX;
-                                                    const newY = d.origY + deltaY;
-                                                    d.lastX = newX;
-                                                    d.lastY = newY;
-                                                    moveTextBox(d.id, newX, newY);
+                                                if (!draggingRef.current) return;
+                                                const d = draggingRef.current;
+                                                const pageIdx = d.page - 1;
+                                                const pn =
+                                                containerRef.current?.querySelectorAll(
+                                                ".react-pdf__Page"
+                                                )[pageIdx] as HTMLElement | undefined;
+                                                if (!pn || !pageDims[pageIdx]) return;
+                                                const rect = pn.getBoundingClientRect();
+                                                const currentScale = pageDims[pageIdx]
+                                                ? rect.width / pageDims[pageIdx].width
+                                                : 1;
+                                                const deltaX =
+                                                (moveEv.clientX - d.startClientX) / currentScale;
+                                                const deltaY =
+                                                (moveEv.clientY - d.startClientY) / currentScale;
+                                                let newX = d.origX + deltaX;
+                                                let newY = d.origY + deltaY;
+                                                
+                                                // Clamp while dragging so box stays fully inside page
+                                                const pageDim = pageDims[pageIdx];
+                                                const currentTb = textBoxes.find(t => t.id === d.id);
+                                                const tbWidth = currentTb ? (currentTb.width || (currentTb.fieldType === "billing" ? 220 : 60)) : 60;
+                                                const tbHeight = currentTb ? (currentTb.height || 36) : 36;
+                                                newX = Math.max(0, Math.min(newX, pageDim.width - (tbWidth - 100)));
+                                                newY = Math.max(0, Math.min(newY, pageDim.height - tbHeight));
+                                                
+                                                d.lastX = newX;
+                                                d.lastY = newY;
+                                                moveTextBox(d.id, newX, newY);
                                                 };
 
                                                 const onPointerUp = (upEv: PointerEvent) => {
@@ -258,8 +366,15 @@ export default function PdfViewer({
                                                         if (pageDim) {
                                                             const tb = textBoxes.find(t => t.id === d.id);
                                                             if (tb) {
-                                                                console.log(tb,'tb.width')
-                                                                const clampedX = Math.max(0, Math.min(d.lastX, pageDim.width - (tb.fieldType === "billing" && tb.width ?tb.width - 55: tb.width || 0)));
+                                                                let mvTbWidth = tb.width || 0
+                                                                if(tb.fieldType === "billing" && tb.width){
+                                                                    mvTbWidth = tb.width - 41;
+                                                                } else if(tb.fieldType === "initials"&& tb.width){
+                                                                    mvTbWidth = tb.width - 45;
+                                                                } else if(tb.fieldType === "text"&& tb.width){
+                                                                    mvTbWidth = tb.width - 35;
+                                                                }
+                                                                const clampedX = Math.max(0, Math.min(d.lastX, pageDim.width - mvTbWidth));
                                                                 const clampedY = Math.max(0, Math.min(d.lastY, pageDim.height - (tb.height || 0)));
                                                                 moveTextBox(d.id, clampedX, clampedY);
                                                             }
@@ -278,9 +393,13 @@ export default function PdfViewer({
                                             };
 
                                             const isBilling = tb.fieldType === "billing";
+                                            const isInitials = tb.fieldType === "initials";
+                                            const isTextBox = tb.fieldType === "text";
+                                            const isSignature = tb.fieldType === "signature";
+                                            const isStamp = tb.fieldType === "stamp";
+                                            const hasImage = (isSignature || isStamp) && getImageUrl(tb.id);
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
                                             const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#e8f2ef";
-                                            // console.log(tb.width,'tb.widthtb.widthtb.width')
                                             return (
                                                 <div
                                                     key={tb.id}
@@ -290,35 +409,231 @@ export default function PdfViewer({
                                                         top,
                                                         zIndex: 10,
                                                     }}
-                                                    onPointerDown={!isAssignmentMode ? onPointerDown : undefined}
+                                                    onPointerDown={!isAssignmentMode && !isSharedDocument ? onPointerDown : undefined}
                                                 >
-                                                    <div style={{
-                                                        background: backgroundColor,
-                                                        ...(isBilling ? { width: tb.width || 100, height: tb.height || 30, display: "flex", alignItems: "center", justifyContent: "center" } : {}),
-                                                        border:
-                                                            tb.id === selectedTextBoxId || isAssignmentMode
-                                                                ? `2px solid ${borderColor}`
-                                                                : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`,
-                                                        borderRadius: "4px",
-                                                        padding: "4px 8px",
-                                                        color: "rgb(36,133,103)",
-                                                        fontWeight: "bold",
-                                                        fontSize: "14px",
-                                                        fontFamily: "monospace",
-                                                        cursor: isAssignmentMode ? "default" : "move",
-                                                        userSelect: "none",
-                                                        ...(isBilling ? { boxSizing: "border-box" } : {}),
-                                                    }}>
-                                                        {tb.content}
+                                                    <div 
+                                                        style={{
+                                                            background: hasImage ? 'transparent' : backgroundColor,
+                                                            width: (isSignature || isStamp) && getImageUrl(tb.id) && isSharedDocument ? tb.width ? `${Math.min(tb.width, 100)}px` : '100px' : (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.width : 'auto',
+                                                            height: (isSignature || isStamp)&& getImageUrl(tb.id)  && isSharedDocument ? tb.width ? `${Math.min(tb.width, 100)}px` : '100px' : (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.height || 36 : 'auto',
+                                                            display: "flex",
+                                                            alignItems: "center",
+                                                            justifyContent: "center",
+                                                            border: hasImage 
+                                                                ? '1px solid #d1d5db'
+                                                                : (tb.id === selectedTextBoxId || isAssignmentMode
+                                                                    ? `2px solid ${borderColor}`
+                                                                    : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`),
+                                                            borderRadius: "4px",
+                                                            padding: (hasImage || isSignature || isStamp) ? "0" : "4px 8px",
+                                                            color: "rgb(36,133,103)",
+                                                            fontWeight: "bold",
+                                                            fontSize: "14px",
+                                                            fontFamily: "monospace",
+                                                            cursor: isAssignmentMode ? "default" : (isSharedDocument ? "pointer" : "move"),
+                                                            userSelect: "none",
+                                                            boxSizing: "border-box",
+                                                        }}
+                                                        onPointerDown={!isAssignmentMode ? (e) => {
+                                                            // Allow dragging from the border/padding area of date fields
+                                                            const target = e.target as HTMLElement;
+                                                            if (target.style.cursor === 'pointer') {
+                                                                // Clicked on the date content, don't drag
+                                                                return;
+                                                            }
+                                                            // Clicked on border/padding, allow drag
+                                                            onPointerDown(e);
+                                                        } : undefined}
+                                                    >
+                                                        {/* Editable content area behaving like a textarea while preserving styling */}
+                                                        {(isSignature || isStamp) ? (
+                                                            getImageUrl(tb.id) ? (
+                                                                <div
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        position: 'relative',
+                                                                    }}
+                                                                >
+                                                                    <img
+                                                                        src={getImageUrl(tb.id)}
+                                                                        alt={isSignature ? "Signature" : "Stamp"}
+                                                                        style={{
+                                                                            maxWidth: tb.width ? `${Math.min(tb.width, 100)}px` : '100px',
+                                                                            maxHeight: tb.height ? `${Math.min(tb.height, 100)}px` : '100px',
+                                                                            width: 'auto',
+                                                                            height: 'auto',
+                                                                            objectFit: 'contain',
+                                                                            pointerEvents: 'none',
+                                                                        }}
+                                                                    />
+                                                                    {!isAssignmentMode && (
+                                                                        <div
+                                                                            style={{
+                                                                                position: 'absolute',
+                                                                                bottom: '4px',
+                                                                                left: '4px',
+                                                                                display: 'flex',
+                                                                                gap: '4px',
+                                                                            }}
+                                                                        >
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    removeImage(tb.id);
+                                                                                }}
+                                                                                style={{
+                                                                                    padding: '4px 8px',
+                                                                                    fontSize: '10px',
+                                                                                    background: '#ef4444',
+                                                                                    color: 'white',
+                                                                                    border: 'none',
+                                                                                    borderRadius: '3px',
+                                                                                    cursor: 'pointer',
+                                                                                }}
+                                                                                title="Remove image"
+                                                                            >
+                                                                                ×
+                                                                            </button>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <div
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (!isAssignmentMode) {
+                                                                            triggerImageUpload(tb.id);
+                                                                        }
+                                                                    }}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        height: '100%',
+                                                                        display: 'flex',
+                                                                        alignItems: 'center',
+                                                                        justifyContent: 'center',
+                                                                        cursor: isAssignmentMode ? 'default' : 'pointer',
+                                                                    }}
+                                                                >
+                                                                    {tb.content}
+                                                                </div>
+                                                            )
+                                                                                                                                ) : tb.fieldType === "date" ? (
+                                                            <div
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (!isAssignmentMode) {
+                                                                        setShowDatePicker(tb.id);
+                                                                        // Parse existing date if present
+                                                                        const dateMatch = tb.content.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
+                                                                        if (dateMatch) {
+                                                                            const [month, day, year] = dateMatch[0].split('/').map(Number);
+                                                                            setSelectedDate(new Date(year, month - 1, day));
+                                                                        } else {
+                                                                            setSelectedDate(null);
+                                                                        }
+                                                                    }
+                                                                }}
+                                                                onPointerDown={(e) => {
+                                                                    // Prevent drag when clicking on date field content
+                                                                    e.stopPropagation();
+                                                                }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    outline: 'none',
+                                                                    border: 'none',
+                                                                    background: 'transparent',
+                                                                    color: 'inherit',
+                                                                    font: 'inherit',
+                                                                    whiteSpace: 'pre-wrap',
+                                                                    overflowWrap: 'anywhere',
+                                                                    lineHeight: '1.2',
+                                                                    cursor: 'pointer',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    pointerEvents: 'auto',
+                                                                }}
+                                                            >
+                                                                {tb.content || 'Click to select date'}
+                                                            </div>
+                                                        ) : (
+                                                            <textarea
+                                                                value={tb.content}
+                                                                readOnly={isAssignmentMode}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                onChange={(e) => {
+                                                                    if (!isAssignmentMode) {
+                                                                        updateTextBox(tb.id, e.target.value);
+                                                                    }
+                                                                }}
+                                                                onKeyDown={(e) => {
+                                                                    // Allow Shift+Enter for new line
+                                                                    if (e.key === 'Enter' && !e.shiftKey) {
+                                                                        // Optional: prevent default Enter behavior if you want
+                                                                        // e.preventDefault();
+                                                                    }
+                                                                }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    outline: 'none',
+                                                                    border: 'none',
+                                                                    background: 'transparent',
+                                                                    color: 'inherit',
+                                                                    font: 'inherit',
+                                                                    fontSize: '14px',
+                                                                    fontWeight: 'bold',
+                                                                    fontFamily: 'monospace',
+                                                                    cursor: isAssignmentMode ? 'default' : 'text',
+                                                                    padding: '0',
+                                                                    direction: 'ltr',
+                                                                    textAlign: 'left',
+                                                                    resize: 'none',
+                                                                    overflow: 'hidden',
+                                                                    whiteSpace: 'pre-wrap',
+                                                                    wordWrap: 'break-word',
+                                                                }}
+                                                            />
+                                                        )}
+                                                        {showDatePicker === tb.id && tb.fieldType === "date" && (
+                                                            <div
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    top: '100%',
+                                                                    left: 0,
+                                                                    zIndex: 1000,
+                                                                    marginTop: '4px',
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <DatePicker
+                                                                    selected={selectedDate}
+                                                                    onChange={(date: Date | null) => {
+                                                                        if (date) {
+                                                                            const formattedDate = `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`;
+                                                                            updateTextBox(tb.id, formattedDate);
+                                                                            setSelectedDate(date);
+                                                                        }
+                                                                        setShowDatePicker(null);
+                                                                    }}
+                                                                    onClickOutside={() => setShowDatePicker(null)}
+                                                                    inline
+                                                                />
+                                                            </div>
+                                                        )}
                                                         {isAssignmentMode && (
                                                             <div
                                                                 style={{
                                                                     position: 'absolute',
-                                                                    top: '100%',       /* Show above */
+                                                                    top: '100%',
                                                                     left: '50%',
                                                                     transform: 'translateX(-50%)',
                                                                     background: 'white',
-                                                                    // padding: '6px',
                                                                     borderRadius: '4px',
                                                                     border: '1px solid #ccc',
                                                                     boxShadow: "0px 2px 8px rgba(0,0,0,0.15)",
@@ -346,7 +661,7 @@ export default function PdfViewer({
                                                                         backgroundColor: "#fff",
                                                                     }}
                                                                 >
-                                                                    <option style={{}} value="">Assign Reciepent</option>
+                                                                    <option value="">Assign Reciepent</option>
                                                                     {recipients.map((recipient) => (
                                                                         <option key={recipient.id} value={recipient.id}>
                                                                             {recipient.first_name} {recipient.last_name}
@@ -355,9 +670,9 @@ export default function PdfViewer({
                                                                 </select>
                                                             </div>
                                                         )}
-                                                        {tb.id === selectedTextBoxId && (
+                                                        {tb.id === selectedTextBoxId && !isSharedDocument && (
                                                             <>
-                                                                {isBilling && (
+                                                                {(isBilling || isInitials || isTextBox || isSignature || isStamp) && (
                                                                     <div
                                                                         style={{
                                                                             position: "absolute",
@@ -372,8 +687,8 @@ export default function PdfViewer({
                                                                         onPointerDown={(e) => {
                                                                             e.stopPropagation();
                                                                             (e.target as Element).setPointerCapture(e.pointerId);
-                                                                            const tbWidth = tb.width || 100;
-                                                                            const tbHeight = tb.height || 30;
+                                                                            const tbWidth = tb.width || (isBilling ? 220 : 60);
+                                                                            const tbHeight = tb.height || 36;
                                                                             resizingRef.current = {
                                                                                 id: tb.id,
                                                                                 page: pageNumber,
@@ -400,8 +715,19 @@ export default function PdfViewer({
                                                                                     (moveEv.clientX - r.startClientX) / currentScale;
                                                                                 const deltaY =
                                                                                     (moveEv.clientY - r.startClientY) / currentScale;
-                                                                                const newWidth = Math.max(50, r.origWidth + deltaX);
-                                                                                const newHeight = Math.max(20, r.origHeight + deltaY);
+                                                                                // Clamp resizing so the box cannot extend outside the page bounds
+                                                                                const pageDim = pageDims[pageIdx];
+                                                                                const currentTb = textBoxes.find(t => t.id === r.id);
+                                                                                const tbX = currentTb ? currentTb.x : 0;
+                                                                                const tbY = currentTb ? currentTb.y : 0;
+                                                                                // Account for padding (8px left + 8px right = 16px) and border (2px each side = 4px) = 20px total
+                                                                                // let paddingAndBorder = (isTextBox&& 104) || (isBilling && 80) || (isInitials && 140) || 0;
+                                                                                const maxWidth = Math.max(40, pageDim.width - tbX);
+                                                                                const maxHeight = Math.max(24, pageDim.height - tbY);
+                                                                                const nextWidth = Math.max(40, r.origWidth + deltaX);
+                                                                                const nextHeight = Math.max(24, r.origHeight + deltaY);
+                                                                                const newWidth = Math.min(nextWidth, maxWidth);
+                                                                                const newHeight = Math.min(nextHeight, maxHeight);
                                                                                 resizeTextBox(r.id, newWidth, newHeight);
                                                                             };
 
@@ -425,30 +751,30 @@ export default function PdfViewer({
                                                                     />
                                                                 )}
                                                                 <button
-                                                                onClick={(e) => {
-                                                                    e.stopPropagation();
-                                                                    removeTextBox(tb.id);
-                                                                }}
-                                                                style={{
-                                                                    position: "absolute",
-                                                                    right: -10,
-                                                                    top: -10,
-                                                                    width: 20,
-                                                                    height: 20,
-                                                                    borderRadius: 10,
-                                                                    background: "#ef4444",
-                                                                    color: "#fff",
-                                                                    border: "none",
-                                                                    cursor: "pointer",
-                                                                    display: "flex",
-                                                                    alignItems: "center",
-                                                                    justifyContent: "center",
-                                                                    fontSize: 12,
-                                                                    zIndex: 20,
-                                                                }}
-                                                            >
-                                                                ×
-                                                            </button>
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        removeTextBox(tb.id);
+                                                                    }}
+                                                                    style={{
+                                                                        position: "absolute",
+                                                                        right: -10,
+                                                                        top: -10,
+                                                                        width: 20,
+                                                                        height: 20,
+                                                                        borderRadius: 10,
+                                                                        background: "#ef4444",
+                                                                        color: "#fff",
+                                                                        border: "none",
+                                                                        cursor: "pointer",
+                                                                        display: "flex",
+                                                                        alignItems: "center",
+                                                                        justifyContent: "center",
+                                                                        fontSize: 12,
+                                                                        zIndex: 20,
+                                                                    }}
+                                                                >
+                                                                    ×
+                                                                </button>
                                                             </>
                                                         )}
                                                     </div>

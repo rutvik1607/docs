@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Maulik Makadiya sent you Gmail - Study mode in ChatGPT for back-to-school via DocuCrafter</title>
+<title>{{ $sender->name ?? 'Someone' }} sent you {{ $documentName ?? 'Document' }} via DocuCrafter</title>
 <style>
   body {
     margin: 0;
@@ -116,21 +116,14 @@
 </head>
 <body>
   <div class="container">
-    <img class="logo" src="https://pandagocdn.pandadoc.com/4a2678d4-10b3-4eb5-a7e1-df9f84c8e668/logo/pandadoc_logo_black.svg" alt="PandaDoc Logo" width="80" />
     <div class="message-box">
       <div class="avatar" aria-label="Profile Icon">&#128100;</div>
       <div class="message-text">
-        <b>Maulik Makadiya</b> sent you <b>Gmail - Study mode in ChatGPT for back-to-school.</b>
+        <b>{{ $sender->name ?? 'Someone' }}</b> sent you <b>{{ $documentName ?? 'Document' }}.</b>
       </div>
     </div>
     <div class="buttons">
       <a href="{{ $link }}" class="btn open-btn">Open the Document</a>
-      {{-- <button class="btn forward" type="button">
-        <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path d="M12 4l1.41 1.41L8.83 10H20v2H8.83l4.58 4.59L12 18l-8-8z"></path>
-        </svg>
-        Forward
-      </button> --}}
     </div>
     <div class="report">
       <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
