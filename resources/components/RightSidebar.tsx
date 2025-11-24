@@ -281,7 +281,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                 {onSave && (
                     <button
                         className="rs-download-btn"
-                        title="Save PDF"
+                        title="Sent Recipient"
                         onClick={onSave}
                     >
                         <svg
@@ -293,7 +293,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                         >
                             <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-10H6V5h9v2z" />
                         </svg>
-                        Save PDF
+                        Sent Recipient
                     </button>
                 )}
             </div>
