@@ -281,19 +281,19 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                 {onSave && (
                     <button
                         className="rs-download-btn"
-                        title="Sent Recipient"
+                        title="Send"
                         onClick={onSave}
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="24"
-                            height="24"
-                            viewBox="0 0 24 24"
+                        <svg 
+                            xmlns="http://www.w3.org/2000/svg" 
+                            width="24" 
+                            height="24" 
+                            viewBox="0 0 24 24" 
                             fill="currentColor"
                         >
-                            <path d="M17 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V7l-4-4zm-5 14a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3-10H6V5h9v2z" />
+                            <path d="M3.4 20.4l18.3-8.3c.9-.4.9-1.7 0-2.1L3.4 1.7A1 1 0 0 0 2 2.7l1.5 6.1 11.2 3.2-11.2 3.2L2 21.3a1 1 0 0 0 1.4 1.1z"/>
                         </svg>
-                        Sent Recipient
+                        Send
                     </button>
                 )}
             </div>

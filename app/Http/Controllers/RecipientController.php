@@ -38,6 +38,7 @@ class RecipientController extends Controller
                 'template_id' => 'required|integer',
             ]);
 
+            info($validator->errors());
             if ($validator->fails()) {
                 return response()->json([
                     'status'      => false,
@@ -89,6 +90,7 @@ class RecipientController extends Controller
             // ------------------------------
             // FAILED RESPONSE
             // ------------------------------
+            info($e->getMessage());
             return response()->json([
                 'status'      => false,
                 'error_code'  => 5000, // Internal error code
