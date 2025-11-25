@@ -3,6 +3,8 @@ import { Document, Page, pdfjs } from "react-pdf";
 import { useState, useRef, useEffect } from "react";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { BillingIcon, DateIcon, SignatureIcon, StampPlaceholderIcon } from "./Icons";
+import SignatureStampUploadModal from "./SignatureStampUploadModal";
 
 interface TextBox {
     id: string;
@@ -66,6 +68,9 @@ export default function PdfViewer({
     const [selectedDate, setSelectedDate] = useState<Date | null>(null);
     const [uploadingImage, setUploadingImage] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [showUploadModal, setShowUploadModal] = useState(false);
+    const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
+    const [uploadingFieldType, setUploadingFieldType] = useState<"signature" | "stamp">("signature");
     const draggingRef = useRef<{
         id: string;
         page: number;
@@ -123,25 +128,34 @@ export default function PdfViewer({
         const reader = new FileReader();
         reader.onload = (e) => {
             const imageUrl = e.target?.result as string;
-            // Trigger a re-render by updating the textbox
-            // We'll store the imageUrl in localStorage and trigger updateTextBox
             const textBox = textBoxes.find(tb => tb.id === textBoxId);
             if (textBox) {
-                // Store image in a separate localStorage key for images
                 const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
                 localStorage.setItem(imageKey, imageUrl);
-                
-                // Also update the textBox with imageData for shared document persistence
-                const updatedTextBoxes = textBoxes.map(tb => 
+
+                const updatedTextBoxes = textBoxes.map(tb =>
                     tb.id === textBoxId ? { ...tb, imageData: imageUrl } : tb
                 );
-                
-                // Trigger update to force re-render
+
                 updateTextBox(textBoxId, textBox.content);
             }
             setUploadingImage(null);
         };
         reader.readAsDataURL(file);
+    };
+
+    const openUploadModal = (textBoxId: string, fieldType: "signature" | "stamp") => {
+        setUploadingFieldId(textBoxId);
+        setUploadingFieldType(fieldType);
+        setShowUploadModal(true);
+    };
+
+    const handleModalUpload = (file: File) => {
+        if (uploadingFieldId) {
+            handleImageUpload(uploadingFieldId, file);
+            setShowUploadModal(false);
+            setUploadingFieldId(null);
+        }
     };
 
     const triggerImageUpload = (textBoxId: string) => {
@@ -166,7 +180,7 @@ export default function PdfViewer({
         if (textBox?.imageData) {
             return textBox.imageData;
         }
-        
+
         // Fallback to localStorage for local editing
         const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
         return localStorage.getItem(imageKey) || undefined;
@@ -174,6 +188,12 @@ export default function PdfViewer({
 
     return (
         <div ref={containerRef}>
+            <SignatureStampUploadModal
+                isOpen={showUploadModal}
+                fieldType={uploadingFieldType}
+                onClose={() => setShowUploadModal(false)}
+                onUpload={handleModalUpload}
+            />
             <input
                 ref={fileInputRef}
                 type="file"
@@ -239,7 +259,7 @@ export default function PdfViewer({
                                         const nextNumber = existingNumbers.length > 0 ? Math.max(...existingNumbers) + 1 : 1;
 
                                         // Generate label like {{textbox=0}}, {{date=1}}, etc.
-                                        const content = `{{${fieldType}=${nextNumber}}}`;
+                                        // const content = fieldType;
 
                                         const lastId = localStorage.getItem('globalTextBoxId') || '0';
                                         const newIdNum = parseInt(lastId) + 1;
@@ -247,26 +267,26 @@ export default function PdfViewer({
                                         const id = `tb_${newIdNum}`;
 
                                         // Default dimensions per field type
-                                        let width = Math.max(60, content.length * 6 + 12);
+                                        let width = Math.max(60, fieldType.length * 6 + 12);
                                         let height = 30;
                                         if (fieldType === "billing") {
-                                        width = width+40; // wider, resizable container for billing details
-                                        height = 36;
+                                            width = width + 120; // wider, resizable container for billing details
+                                            height = 36;
                                         } else if (fieldType === "initials") {
-                                        width = width+42; // square-ish for initials
-                                        height = 36;
+                                            width = width + 42; // square-ish for initials
+                                            height = 36;
                                         } else if (fieldType === "text") {
-                                        width = width+35; // square-ish for initials
-                                        height = 36;
+                                            width = width + 80; // square-ish for initials
+                                            height = 36;
                                         } else if (fieldType === "signature") {
-                                        width = 200; // wider for signature
-                                        height = 80;
+                                            width = 200; // wider for signature
+                                            height = 80;
                                         } else if (fieldType === "stamp") {
-                                        width = 120; // square-ish for stamp
-                                        height = 120;
+                                            width = 120; // square-ish for stamp
+                                            height = 120;
                                         }
 
-                                        addTextBox({ id, page: pageNumber, x, y, content, fieldType, width, height });
+                                        addTextBox({ id, page: pageNumber, x, y, content:'', fieldType, width, height });
                                     } catch (err) {
                                         console.error("Drop parse error", err);
                                     }
@@ -322,36 +342,36 @@ export default function PdfViewer({
                                                 setSelectedTextBoxId(tb.id);
 
                                                 const onPointerMove = (moveEv: PointerEvent) => {
-                                                if (!draggingRef.current) return;
-                                                const d = draggingRef.current;
-                                                const pageIdx = d.page - 1;
-                                                const pn =
-                                                containerRef.current?.querySelectorAll(
-                                                ".react-pdf__Page"
-                                                )[pageIdx] as HTMLElement | undefined;
-                                                if (!pn || !pageDims[pageIdx]) return;
-                                                const rect = pn.getBoundingClientRect();
-                                                const currentScale = pageDims[pageIdx]
-                                                ? rect.width / pageDims[pageIdx].width
-                                                : 1;
-                                                const deltaX =
-                                                (moveEv.clientX - d.startClientX) / currentScale;
-                                                const deltaY =
-                                                (moveEv.clientY - d.startClientY) / currentScale;
-                                                let newX = d.origX + deltaX;
-                                                let newY = d.origY + deltaY;
-                                                
-                                                // Clamp while dragging so box stays fully inside page
-                                                const pageDim = pageDims[pageIdx];
-                                                const currentTb = textBoxes.find(t => t.id === d.id);
-                                                const tbWidth = currentTb ? (currentTb.width || (currentTb.fieldType === "billing" ? 220 : 60)) : 60;
-                                                const tbHeight = currentTb ? (currentTb.height || 36) : 36;
-                                                newX = Math.max(0, Math.min(newX, pageDim.width - (tbWidth - 100)));
-                                                newY = Math.max(0, Math.min(newY, pageDim.height - tbHeight));
-                                                
-                                                d.lastX = newX;
-                                                d.lastY = newY;
-                                                moveTextBox(d.id, newX, newY);
+                                                    if (!draggingRef.current) return;
+                                                    const d = draggingRef.current;
+                                                    const pageIdx = d.page - 1;
+                                                    const pn =
+                                                        containerRef.current?.querySelectorAll(
+                                                            ".react-pdf__Page"
+                                                        )[pageIdx] as HTMLElement | undefined;
+                                                    if (!pn || !pageDims[pageIdx]) return;
+                                                    const rect = pn.getBoundingClientRect();
+                                                    const currentScale = pageDims[pageIdx]
+                                                        ? rect.width / pageDims[pageIdx].width
+                                                        : 1;
+                                                    const deltaX =
+                                                        (moveEv.clientX - d.startClientX) / currentScale;
+                                                    const deltaY =
+                                                        (moveEv.clientY - d.startClientY) / currentScale;
+                                                    let newX = d.origX + deltaX;
+                                                    let newY = d.origY + deltaY;
+
+                                                    // Clamp while dragging so box stays fully inside page
+                                                    const pageDim = pageDims[pageIdx];
+                                                    const currentTb = textBoxes.find(t => t.id === d.id);
+                                                    const tbWidth = currentTb ? (currentTb.width || (currentTb.fieldType === "billing" ? 220 : 60)) : 60;
+                                                    const tbHeight = currentTb ? (currentTb.height || 36) : 36;
+                                                    newX = Math.max(0, Math.min(newX, pageDim.width - (tbWidth - 100)));
+                                                    newY = Math.max(0, Math.min(newY, pageDim.height - tbHeight));
+
+                                                    d.lastX = newX;
+                                                    d.lastY = newY;
+                                                    moveTextBox(d.id, newX, newY);
                                                 };
 
                                                 const onPointerUp = (upEv: PointerEvent) => {
@@ -359,7 +379,7 @@ export default function PdfViewer({
                                                         (e.target as Element).releasePointerCapture(
                                                             e.pointerId
                                                         );
-                                                    } catch {}
+                                                    } catch { }
                                                     if (draggingRef.current) {
                                                         const d = draggingRef.current;
                                                         const pageDim = pageDims[d.page - 1];
@@ -367,12 +387,9 @@ export default function PdfViewer({
                                                             const tb = textBoxes.find(t => t.id === d.id);
                                                             if (tb) {
                                                                 let mvTbWidth = tb.width || 0
-                                                                if(tb.fieldType === "billing" && tb.width){
-                                                                    mvTbWidth = tb.width - 41;
-                                                                } else if(tb.fieldType === "initials"&& tb.width){
-                                                                    mvTbWidth = tb.width - 45;
-                                                                } else if(tb.fieldType === "text"&& tb.width){
-                                                                    mvTbWidth = tb.width - 35;
+                                                                console.log(tb,'tbtbtbtb')
+                                                                if ((tb.fieldType === "billing" || tb.fieldType === "initials" || tb.fieldType === "text") && tb.width) {
+                                                                    mvTbWidth = tb.width - (tb.width/3.15);
                                                                 }
                                                                 const clampedX = Math.max(0, Math.min(d.lastX, pageDim.width - mvTbWidth));
                                                                 const clampedY = Math.max(0, Math.min(d.lastY, pageDim.height - (tb.height || 0)));
@@ -399,7 +416,7 @@ export default function PdfViewer({
                                             const isStamp = tb.fieldType === "stamp";
                                             const hasImage = (isSignature || isStamp) && getImageUrl(tb.id);
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
-                                            const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#e8f2ef";
+                                            const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566";
                                             return (
                                                 <div
                                                     key={tb.id}
@@ -411,15 +428,15 @@ export default function PdfViewer({
                                                     }}
                                                     onPointerDown={!isAssignmentMode && !isSharedDocument ? onPointerDown : undefined}
                                                 >
-                                                    <div 
+                                                    <div
                                                         style={{
                                                             background: hasImage ? 'transparent' : backgroundColor,
-                                                            width: (isSignature || isStamp) && getImageUrl(tb.id) && isSharedDocument ? tb.width ? `${Math.min(tb.width, 100)}px` : '100px' : (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.width : 'auto',
-                                                            height: (isSignature || isStamp)&& getImageUrl(tb.id)  && isSharedDocument ? tb.width ? `${Math.min(tb.width, 100)}px` : '100px' : (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.height || 36 : 'auto',
+                                                            width: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.width : 'auto',
+                                                            height: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.height || 36 : 'auto',
                                                             display: "flex",
                                                             alignItems: "center",
                                                             justifyContent: "center",
-                                                            border: hasImage 
+                                                            border: hasImage
                                                                 ? '1px solid #d1d5db'
                                                                 : (tb.id === selectedTextBoxId || isAssignmentMode
                                                                     ? `2px solid ${borderColor}`
@@ -434,7 +451,7 @@ export default function PdfViewer({
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
                                                         }}
-                                                        onPointerDown={!isAssignmentMode ? (e) => {
+                                                        onPointerDown={!isAssignmentMode && !isSharedDocument ? (e) => {
                                                             // Allow dragging from the border/padding area of date fields
                                                             const target = e.target as HTMLElement;
                                                             if (target.style.cursor === 'pointer') {
@@ -462,8 +479,8 @@ export default function PdfViewer({
                                                                         src={getImageUrl(tb.id)}
                                                                         alt={isSignature ? "Signature" : "Stamp"}
                                                                         style={{
-                                                                            maxWidth: tb.width ? `${Math.min(tb.width, 100)}px` : '100px',
-                                                                            maxHeight: tb.height ? `${Math.min(tb.height, 100)}px` : '100px',
+                                                                            maxWidth: tb.width ? `${tb.width}px` : '100%',
+                                                                            maxHeight: tb.height ? `${tb.height}px` : '100%',
                                                                             width: 'auto',
                                                                             height: 'auto',
                                                                             objectFit: 'contain',
@@ -503,10 +520,10 @@ export default function PdfViewer({
                                                                 </div>
                                                             ) : (
                                                                 <div
-                                                                    onClick={(e) => {
+                                                                    onDoubleClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (!isAssignmentMode) {
-                                                                            triggerImageUpload(tb.id);
+                                                                        if (!isAssignmentMode && !isSharedDocument) {
+                                                                            openUploadModal(tb.id, isSignature ? "signature" : "stamp");
                                                                         }
                                                                     }}
                                                                     style={{
@@ -515,13 +532,16 @@ export default function PdfViewer({
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        cursor: isAssignmentMode ? 'default' : 'pointer',
+                                                                        cursor: isAssignmentMode || isSharedDocument ? 'default' : 'pointer',
+                                                                        color: tb.content ? '#2f7d6f' : 'inherit',
                                                                     }}
                                                                 >
-                                                                    {tb.content}
+                                                                    {isSignature?
+                                                                    <SignatureIcon />:<StampPlaceholderIcon />}
+                                                                    {isSignature ? "Signature" : "Stamp"}
                                                                 </div>
                                                             )
-                                                                                                                                ) : tb.fieldType === "date" ? (
+                                                        ) : tb.fieldType === "date" ? (
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
@@ -557,13 +577,23 @@ export default function PdfViewer({
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
                                                                     pointerEvents: 'auto',
+                                                                    gap: '4px',
                                                                 }}
                                                             >
-                                                                {tb.content || 'Click to select date'}
+                                                                {(tb.content !== 'date' && tb.content) || 'Select Date'}
+                                                                <DateIcon />
                                                             </div>
                                                         ) : (
+                                                            <>
                                                             <textarea
                                                                 value={tb.content}
+                                                                placeholder={
+                                                                    tb.fieldType === "signature" ? "Signature" :
+                                                                    tb.fieldType === "initials" ? "Initials" :
+                                                                    tb.fieldType === "stamp" ? "Stamp" :
+                                                                    tb.fieldType === "billing" ? "Billing details" :
+                                                                    "Enter value"
+                                                                }
                                                                 readOnly={isAssignmentMode}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => {
@@ -592,13 +622,14 @@ export default function PdfViewer({
                                                                     cursor: isAssignmentMode ? 'default' : 'text',
                                                                     padding: '0',
                                                                     direction: 'ltr',
-                                                                    textAlign: 'left',
+                                                                    textAlign: 'center',
                                                                     resize: 'none',
                                                                     overflow: 'hidden',
                                                                     whiteSpace: 'pre-wrap',
                                                                     wordWrap: 'break-word',
                                                                 }}
                                                             />
+                                                            </>
                                                         )}
                                                         {showDatePicker === tb.id && tb.fieldType === "date" && (
                                                             <div
@@ -736,7 +767,7 @@ export default function PdfViewer({
                                                                                     (e.target as Element).releasePointerCapture(
                                                                                         e.pointerId
                                                                                     );
-                                                                                } catch {}
+                                                                                } catch { }
                                                                                 window.removeEventListener(
                                                                                     "pointermove",
                                                                                     onPointerMove

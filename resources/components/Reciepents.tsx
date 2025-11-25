@@ -18,10 +18,18 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
     country: "",
     stateRegion: "",
   });
+  const [fieldErrors, setFieldErrors] = useState<{[key: string]: string}>({});
 
   const handleChange = (e:any) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    if (fieldErrors[name]) {
+      setFieldErrors((prev) => {
+        const updated = { ...prev };
+        delete updated[name];
+        return updated;
+      });
+    }
   };
 
   const toggleFields = () => setShowMoreFields((prev) => !prev);
@@ -29,6 +37,7 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
   const handleSubmit = async (e:any) => {
     e.preventDefault();
     setIsLoading(true);
+    setFieldErrors({});
 
     try {
       // Transform form data to match API expectations (camelCase to snake_case)
@@ -54,12 +63,25 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
         onCreate(response.data);
         onClose();
       } else {
-        toast.error(response.message || "Failed to create recipient");
+        const errors = response.errors || {};
+        if (Object.keys(errors).length > 0) {
+          setFieldErrors(errors);
+          toast.error(Object.values(errors)[0] as string || "Validation failed");
+        } else {
+          toast.error(response.message || "Failed to create recipient");
+        }
       }
     } catch (error:any) {
       console.error("Error creating recipient:", error);
-      const errorMessage = error.response?.data?.message || "Failed to create recipient";
-      toast.error(errorMessage);
+      const errorData = error.response?.data;
+      
+      if (errorData?.errors && typeof errorData.errors === 'object') {
+        setFieldErrors(errorData.errors);
+        toast.error(Object.values(errorData.errors)[0] as string || "Validation failed");
+      } else {
+        const errorMessage = errorData?.message || "Failed to create recipient";
+        toast.error(errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -79,7 +101,10 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
         <form onSubmit={handleSubmit} className="form">
           <div className="grid-2-columns">
             <label>
-              FIRST NAME
+              <div className="label-text">
+                <span>FIRST NAME</span>
+                <span className="required-asterisk">*</span>
+              </div>
               <input
                 type="text"
                 name="firstName"
@@ -90,7 +115,10 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
               />
             </label>
             <label>
-              LAST NAME
+              <div className="label-text">
+                <span>LAST NAME</span>
+                <span className="required-asterisk">*</span>
+              </div>
               <input
                 type="text"
                 name="lastName"
@@ -103,7 +131,10 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
           </div>
 
           <label>
-            EMAIL
+            <div className="label-text">
+              <span>EMAIL</span>
+              <span className="required-asterisk">*</span>
+            </div>
             <input
               type="email"
               name="email"
@@ -111,7 +142,11 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
               onChange={handleChange}
               autoComplete="email"
               required
+              className={fieldErrors.email ? "input-error" : ""}
             />
+            {fieldErrors.email && (
+              <span className="field-error-message">{fieldErrors.email}</span>
+            )}
           </label>
 
           <label>
@@ -300,6 +335,16 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
           gap: 6px;
         }
 
+        .label-text {
+          display: flex;
+          gap: 2px;
+        }
+
+        .required-asterisk {
+          color: #ff6b6b;
+          font-weight: 700;
+        }
+
         input {
           height: 32px;
           padding: 6px 8px;
@@ -313,6 +358,23 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
         input:focus {
           border-color: #a2b5a1;
           outline: none;
+        }
+
+        input.input-error {
+          border-color: #ff6b6b;
+          background-color: #fff5f5;
+        }
+
+        input.input-error:focus {
+          border-color: #ff6b6b;
+          outline: 2px solid rgba(255, 107, 107, 0.2);
+        }
+
+        .field-error-message {
+          color: #ff6b6b;
+          font-size: 12px;
+          font-weight: 500;
+          margin-top: 2px;
         }
 
         .grid-2-columns {

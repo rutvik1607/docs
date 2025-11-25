@@ -14,7 +14,7 @@ interface AddRecipientModalProps {
     onSuccess: () => void;
     templateId?: number;
     userId?: number;
-    showAddRecipientModal: boolean
+    showAddRecipientModal?: boolean
 }
 
 const AddRecipientModal = ({ showAddRecipientModal, onClose, onSuccess, templateId = 1, userId = 1 }: AddRecipientModalProps) => {
@@ -23,7 +23,7 @@ const AddRecipientModal = ({ showAddRecipientModal, onClose, onSuccess, template
     const [selectedRecipients, setSelectedRecipients] = useState<Set<number>>(new Set());
     const [isSearching, setIsSearching] = useState(false);
     const [isAdding, setIsAdding] = useState(false);
-    const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const searchTimeoutRef = useRef<any>(null);
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {

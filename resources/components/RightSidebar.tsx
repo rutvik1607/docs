@@ -4,48 +4,41 @@
 import { DragEvent, JSX, useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import { getRecipientsByTemplate, deleteRecipient } from "../js/api/api";
 import AddRecipientModal from "./AddRecipientModal";
+import { BillingIcon, DateIcon, InitialsIcon, RecipeentIcon, SendIcon, SignatureIcon, StampPlaceholderIcon, TextIcon, TrashIcon } from "./Icons";
 
 // Button model to standardize icon or svg
 type FieldButton = {
     type: string;
     label: string;
-    icon?: string; // e.g., "A", "IN"
+    icon?: JSX.Element; // e.g., "A", "IN"
     svg?: JSX.Element; // for glyphs
 };
 
 const fieldButtons: FieldButton[][] = [
     [
-        { icon: "A", type: "text", label: "Enter Value" },
+        { icon: <TextIcon height={24} width={24} />, type: "text", label: "Enter Value" },
         {
-            svg: (
-                <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
-            ),
+            icon: <SignatureIcon height={24} width={24} />,
             type: "signature",
             label: "Signature",
         },
     ],
     [
-        { icon: "IN", type: "initials", label: "Initials" },
+        { icon: <InitialsIcon height={24} width={24} />, type: "initials", label: "Initials" },
         {
-            svg: (
-                <path d="M9 11H7v6h2v-6zm4 0h-2v6h2v-6zm4 0h-2v6h2v-6zm2.5-9H19V1h-2v1H7V1H5v1H3.5C2.67 2 2 2.67 2 3.5v15C2 19.33 2.67 20 3.5 20h17c.83 0 1.5-.67 1.5-1.5v-15C22 2.67 21.33 2 20.5 2z" />
-            ),
+            icon: <DateIcon height={24} width={24} />,
             type: "date",
             label: "Date",
         },
     ],
     [
         {
-            svg: (
-                <path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z" />
-            ),
+            icon: <BillingIcon height={24} width={24} />,
             type: "billing",
             label: "Billing details",
         },
         {
-            svg: (
-                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-            ),
+            icon: <StampPlaceholderIcon height={24} width={24} />,
             type: "stamp",
             label: "Stamp",
         },
@@ -168,8 +161,6 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
         });
     };
 
-    console.log("Recipients:", recipients);
-
     return (
         <aside className="right-sidebar">
             {/* Header area like screenshot: title and close icon placeholder */}
@@ -191,25 +182,13 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                                 }
                             >
                                 <span className="rs-btn-inner">
-                                    <span className="rs-glyph">
-                                        {field.icon ? (
-                                            <span className="rs-icon-text">
-                                                {field.icon}
-                                            </span>
-                                        ) : (
-                                            <svg
-                                                width="18"
-                                                height="18"
-                                                viewBox="0 0 24 24"
-                                                fill="currentColor"
-                                                aria-hidden
-                                            >
-                                                {field.svg}
-                                            </svg>
-                                        )}
-                                    </span>
                                     <span className="rs-label">
                                         {field.label}
+                                    </span>
+                                    <span className="rs-glyph">
+                                        <span className="rs-icon-text">
+                                            {field.icon}
+                                        </span>
                                     </span>
                                 </span>
                             </button>
@@ -230,7 +209,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                         title="Add existing recipients"
                         onClick={() => setShowAddRecipientModal(true)}
                     >
-                        <svg fill="currentcolor" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 512"><path d="M136 128a120 120 0 1 1 240 0 120 120 0 1 1 -240 0zM48 482.3C48 383.8 127.8 304 226.3 304l59.4 0c98.5 0 178.3 79.8 178.3 178.3 0 16.4-13.3 29.7-29.7 29.7L77.7 512C61.3 512 48 498.7 48 482.3zM544 96c13.3 0 24 10.7 24 24l0 48 48 0c13.3 0 24 10.7 24 24s-10.7 24-24 24l-48 0 0 48c0 13.3-10.7 24-24 24s-24-10.7-24-24l0-48-48 0c-13.3 0-24-10.7-24-24s10.7-24 24-24l48 0 0-48c0-13.3 10.7-24 24-24z"/></svg>
+                        <RecipeentIcon height={20} width={20} /> 
                     </button>
                 </div>
 
@@ -260,14 +239,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                                         onClick={() => openDeleteConfirmation(recipient)}
                                         title="Delete recipient"
                                     >
-                                        <svg
-                                            width="22"
-                                            height="22"
-                                            viewBox="0 0 24 24"
-                                            fill="currentColor"
-                                        >
-                                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-9l-1 1H5v2h14V4z" />
-                                        </svg>
+                                        <TrashIcon height={20} width={20} />
                                     </button>
                                 </div>
                             ))}
@@ -284,15 +256,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                         title="Send"
                         onClick={onSave}
                     >
-                        <svg 
-                            xmlns="http://www.w3.org/2000/svg" 
-                            width="24" 
-                            height="24" 
-                            viewBox="0 0 24 24" 
-                            fill="currentColor"
-                        >
-                            <path d="M3.4 20.4l18.3-8.3c.9-.4.9-1.7 0-2.1L3.4 1.7A1 1 0 0 0 2 2.7l1.5 6.1 11.2 3.2-11.2 3.2L2 21.3a1 1 0 0 0 1.4 1.1z"/>
-                        </svg>
+                        <SendIcon height={20} width={20} />
                         Send
                     </button>
                 )}
