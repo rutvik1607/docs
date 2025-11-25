@@ -444,7 +444,6 @@ class RecipientController extends Controller
                 'token' => 'required|string',
                 'fields' => 'required|array',
                 'fields.*.id' => 'required|string',
-                'fields.*.content' => 'required|string',
             ]);
 
             if ($validator->fails()) {
@@ -668,7 +667,7 @@ class RecipientController extends Controller
                 'fields' => 'required|array',
                 'fields.*.id' => 'required|string',
                 'fields.*.recipientId' => 'required|integer',
-                'fields.*.content' => 'required|string',
+                'fields.*.content' => 'nullable|string',
                 'fields.*.fieldType' => 'nullable|string',
                 'fields.*.page' => 'required|integer',
                 'fields.*.x' => 'required|numeric',

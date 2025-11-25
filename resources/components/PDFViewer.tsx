@@ -18,6 +18,7 @@ interface TextBox {
     recipientId?: number | null;
     imageUrl?: string;
     imageData?: string;
+    isSubmitted?: boolean;
 }
 
 interface Recipient {
@@ -417,6 +418,7 @@ export default function PdfViewer({
                                             const hasImage = (isSignature || isStamp) && getImageUrl(tb.id);
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
                                             const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566";
+                                            const isSubmitted = tb.isSubmitted === true;
                                             return (
                                                 <div
                                                     key={tb.id}
@@ -426,32 +428,34 @@ export default function PdfViewer({
                                                         top,
                                                         zIndex: 10,
                                                     }}
-                                                    onPointerDown={!isAssignmentMode && !isSharedDocument ? onPointerDown : undefined}
+                                                    onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted ? onPointerDown : undefined}
                                                 >
                                                     <div
                                                         style={{
-                                                            background: hasImage ? 'transparent' : backgroundColor,
+                                                            background: isSubmitted ? 'transparent' : (hasImage ? 'transparent' : backgroundColor),
                                                             width: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.width : 'auto',
                                                             height: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.height || 36 : 'auto',
                                                             display: "flex",
                                                             alignItems: "center",
                                                             justifyContent: "center",
-                                                            border: hasImage
-                                                                ? '1px solid #d1d5db'
-                                                                : (tb.id === selectedTextBoxId || isAssignmentMode
-                                                                    ? `2px solid ${borderColor}`
-                                                                    : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`),
+                                                            border: isSubmitted
+                                                                ? 'none'
+                                                                : (hasImage
+                                                                    ? '1px solid #d1d5db'
+                                                                    : (tb.id === selectedTextBoxId || isAssignmentMode
+                                                                        ? `2px solid ${borderColor}`
+                                                                        : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`)),
                                                             borderRadius: "4px",
-                                                            padding: (hasImage || isSignature || isStamp) ? "0" : "4px 8px",
+                                                            padding: isSubmitted ? "0" : ((hasImage || isSignature || isStamp) ? "0" : "4px 8px"),
                                                             color: "rgb(36,133,103)",
                                                             fontWeight: "bold",
                                                             fontSize: "14px",
                                                             fontFamily: "monospace",
-                                                            cursor: isAssignmentMode ? "default" : (isSharedDocument ? "pointer" : "move"),
+                                                            cursor: isSubmitted ? "default" : (isAssignmentMode ? "default" : (isSharedDocument ? "pointer" : "move")),
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
                                                         }}
-                                                        onPointerDown={!isAssignmentMode && !isSharedDocument ? (e) => {
+                                                        onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted ? (e) => {
                                                             // Allow dragging from the border/padding area of date fields
                                                             const target = e.target as HTMLElement;
                                                             if (target.style.cursor === 'pointer') {
@@ -487,7 +491,7 @@ export default function PdfViewer({
                                                                             pointerEvents: 'none',
                                                                         }}
                                                                     />
-                                                                    {!isAssignmentMode && (
+                                                                    {!isAssignmentMode && !isSubmitted && !isSharedDocument && (
                                                                         <div
                                                                             style={{
                                                                                 position: 'absolute',
@@ -522,7 +526,7 @@ export default function PdfViewer({
                                                                 <div
                                                                     onDoubleClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (!isAssignmentMode && !isSharedDocument) {
+                                                                        if (!isAssignmentMode && !isSubmitted) {
                                                                             openUploadModal(tb.id, isSignature ? "signature" : "stamp");
                                                                         }
                                                                     }}
@@ -532,7 +536,7 @@ export default function PdfViewer({
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        cursor: isAssignmentMode || isSharedDocument ? 'default' : 'pointer',
+                                                                        cursor: isAssignmentMode || isSubmitted ? 'default' : 'pointer',
                                                                         color: tb.content ? '#2f7d6f' : 'inherit',
                                                                     }}
                                                                 >
@@ -545,7 +549,7 @@ export default function PdfViewer({
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (!isAssignmentMode) {
+                                                                    if (!isAssignmentMode && !isSubmitted) {
                                                                         setShowDatePicker(tb.id);
                                                                         // Parse existing date if present
                                                                         const dateMatch = tb.content.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
@@ -572,16 +576,17 @@ export default function PdfViewer({
                                                                     whiteSpace: 'pre-wrap',
                                                                     overflowWrap: 'anywhere',
                                                                     lineHeight: '1.2',
-                                                                    cursor: 'pointer',
+                                                                    cursor: isSubmitted ? 'default' : 'pointer',
                                                                     display: 'flex',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
-                                                                    pointerEvents: 'auto',
+                                                                    padding: '4px 5px',
+                                                                    pointerEvents: isSubmitted ? 'none' : 'auto',
                                                                     gap: '4px',
                                                                 }}
                                                             >
                                                                 {(tb.content !== 'date' && tb.content) || 'Select Date'}
-                                                                <DateIcon />
+                                                                {!isSubmitted && <DateIcon />}
                                                             </div>
                                                         ) : (
                                                             <>
@@ -594,10 +599,10 @@ export default function PdfViewer({
                                                                     tb.fieldType === "billing" ? "Billing details" :
                                                                     "Enter value"
                                                                 }
-                                                                readOnly={isAssignmentMode}
+                                                                readOnly={isAssignmentMode || isSubmitted}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => {
-                                                                    if (!isAssignmentMode) {
+                                                                    if (!isAssignmentMode && !isSubmitted) {
                                                                         updateTextBox(tb.id, e.target.value);
                                                                     }
                                                                 }}
@@ -631,7 +636,7 @@ export default function PdfViewer({
                                                             />
                                                             </>
                                                         )}
-                                                        {showDatePicker === tb.id && tb.fieldType === "date" && (
+                                                        {showDatePicker === tb.id && tb.fieldType === "date" && !isSubmitted && (
                                                             <div
                                                                 style={{
                                                                     position: 'absolute',
@@ -701,7 +706,7 @@ export default function PdfViewer({
                                                                 </select>
                                                             </div>
                                                         )}
-                                                        {tb.id === selectedTextBoxId && !isSharedDocument && (
+                                                        {tb.id === selectedTextBoxId && !isSharedDocument && !isSubmitted && (
                                                             <>
                                                                 {(isBilling || isInitials || isTextBox || isSignature || isStamp) && (
                                                                     <div
