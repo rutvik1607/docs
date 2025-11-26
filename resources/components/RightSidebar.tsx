@@ -58,6 +58,11 @@ interface RightSidebarProps {
     templateId?: number;
     userId?: number;
     onRecipientUpdate?: (recipients: Recipient[]) => void;
+    isAssignmentMode?: boolean;
+    assignedCount?: number;
+    totalFields?: number;
+    onCancelAssignment?: () => void;
+    onCompleteAssignment?: () => void;
 }
 
 interface RightSidebarHandle {
@@ -70,6 +75,11 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
     templateId = 1,
     userId = 1,
     onRecipientUpdate,
+    isAssignmentMode,
+    assignedCount,
+    totalFields,
+    onCancelAssignment,
+    onCompleteAssignment,
 }, ref) => {
     const [recipients, setRecipients] = useState<Recipient[]>([]);
     const [loading, setLoading] = useState(false);
@@ -165,102 +175,159 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
         <aside className="right-sidebar">
             {/* Header area like screenshot: title and close icon placeholder */}
             <div className="rs-header">
-                <h3 className="rs-title">Add Fields</h3>
+                <h3 className="rs-title">{isAssignmentMode ? "Assign Fields" : "Add Fields"}</h3>
             </div>
 
-            {/* Grid of field buttons */}
-            <div className="rs-grid">
-                {fieldButtons.map((row, rowIndex) => (
-                    <div className="rs-row" key={rowIndex}>
-                        {row.map((field, i) => (
-                            <button
-                                key={i}
-                                className={`rs-btn ${field.type}`}
-                                draggable
-                                onDragStart={(e) =>
-                                    handleDragStart(e, field.type, field.label)
-                                }
-                            >
-                                <span className="rs-btn-inner">
-                                    <span className="rs-label">
-                                        {field.label}
-                                    </span>
-                                    <span className="rs-glyph">
-                                        <span className="rs-icon-text">
-                                            {field.icon}
-                                        </span>
-                                    </span>
-                                </span>
-                            </button>
-                        ))}
+            {isAssignmentMode ? (
+                <div className="rs-assignment-mode">
+                    <div className="rs-assignment-info">
+                        <p className="rs-assignment-text">
+                            Assign Recipients to All Fields
+                        </p>
+                        <p className="rs-assignment-count">
+                            {assignedCount} of {totalFields} assigned
+                        </p>
                     </div>
-                ))}
-                <div className="rs-recipients-btns">
-                    <button
-                        className="rs-download-btn"
-                        onClick={() => {
-                            setReciepentModal(true);
-                        }}
-                    >
-                        Add Recipient
-                    </button>
-                    <button
-                        className="rs-header-add-recipient-btn"
-                        title="Add existing recipients"
-                        onClick={() => setShowAddRecipientModal(true)}
-                    >
-                        <RecipeentIcon height={20} width={20} /> 
-                    </button>
-                </div>
-
-                {/* Recipients List */}
-                {recipients.length > 0 && (
-                    <div className="rs-recipients-section">
-                        <h4 className="rs-recipients-title">
-                            Recipients ({recipients.length})
-                        </h4>
-                        <div className="rs-recipients-list">
-                            {recipients.map((recipient) => (
-                                <div
-                                    key={recipient.id}
-                                    className="rs-recipient-item"
-                                >
-                                    <div className="rs-recipient-info">
-                                        <div className="rs-recipient-name">
-                                            {recipient.first_name}{" "}
-                                            {recipient.last_name}
-                                        </div>
-                                        <div className="rs-recipient-email">
-                                            {recipient.email}
+                    
+                    {/* Recipients List for Assignment */}
+                    {recipients.length > 0 && (
+                        <div className="rs-recipients-section">
+                            <h4 className="rs-recipients-title">
+                                Recipients ({recipients.length})
+                            </h4>
+                            <div className="rs-recipients-list">
+                                {recipients.map((recipient) => (
+                                    <div
+                                        key={recipient.id}
+                                        className="rs-recipient-item"
+                                    >
+                                        <div className="rs-recipient-info">
+                                            <div className="rs-recipient-name">
+                                                {recipient.first_name}{" "}
+                                                {recipient.last_name}
+                                            </div>
+                                            <div className="rs-recipient-email">
+                                                {recipient.email}
+                                            </div>
                                         </div>
                                     </div>
-                                    <button
-                                        className="rs-recipient-delete-btn"
-                                        onClick={() => openDeleteConfirmation(recipient)}
-                                        title="Delete recipient"
-                                    >
-                                        <TrashIcon height={20} width={20} />
-                                    </button>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
-                    </div>
-                )}
-            </div>
+                    )}
 
-            {/* Download button at the bottom */}
-            <div className="rs-download-container">
-                {onSave && (
-                    <button
-                        className="rs-download-btn"
-                        title="Send"
-                        onClick={onSave}
-                    >
-                        <SendIcon height={20} width={20} />
-                        Send
-                    </button>
-                )}
-            </div>
+                    <div className="rs-assignment-actions">
+                        <button
+                            className="rs-btn-cancel"
+                            onClick={onCancelAssignment}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="rs-btn-confirm"
+                            onClick={onCompleteAssignment}
+                        >
+                            Send
+                        </button>
+                    </div>
+                </div>
+            ) : (
+                <>
+                    {/* Grid of field buttons */}
+                    <div className="rs-grid">
+                        {fieldButtons.map((row, rowIndex) => (
+                            <div className="rs-row" key={rowIndex}>
+                                {row.map((field, i) => (
+                                    <button
+                                        key={i}
+                                        className={`rs-btn ${field.type}`}
+                                        draggable
+                                        onDragStart={(e) =>
+                                            handleDragStart(e, field.type, field.label)
+                                        }
+                                    >
+                                        <span className="rs-btn-inner">
+                                            <span className="rs-label">
+                                                {field.label}
+                                            </span>
+                                            <span className="rs-glyph">
+                                                <span className="rs-icon-text">
+                                                    {field.icon}
+                                                </span>
+                                            </span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        ))}
+                        <div className="rs-recipients-btns">
+                            <button
+                                className="rs-download-btn"
+                                onClick={() => {
+                                    setReciepentModal(true);
+                                }}
+                            >
+                                Add Recipient
+                            </button>
+                            <button
+                                className="rs-header-add-recipient-btn"
+                                title="Add existing recipients"
+                                onClick={() => setShowAddRecipientModal(true)}
+                            >
+                                <RecipeentIcon height={20} width={20} /> 
+                            </button>
+                        </div>
+
+                        {/* Recipients List */}
+                        {recipients.length > 0 && (
+                            <div className="rs-recipients-section">
+                                <h4 className="rs-recipients-title">
+                                    Recipients ({recipients.length})
+                                </h4>
+                                <div className="rs-recipients-list">
+                                    {recipients.map((recipient) => (
+                                        <div
+                                            key={recipient.id}
+                                            className="rs-recipient-item"
+                                        >
+                                            <div className="rs-recipient-info">
+                                                <div className="rs-recipient-name">
+                                                    {recipient.first_name}{" "}
+                                                    {recipient.last_name}
+                                                </div>
+                                                <div className="rs-recipient-email">
+                                                    {recipient.email}
+                                                </div>
+                                            </div>
+                                            <button
+                                                className="rs-recipient-delete-btn"
+                                                onClick={() => openDeleteConfirmation(recipient)}
+                                                title="Delete recipient"
+                                            >
+                                                <TrashIcon height={20} width={20} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Download button at the bottom */}
+                    <div className="rs-download-container">
+                        {onSave && (
+                            <button
+                                className="rs-download-btn"
+                                title="Send"
+                                onClick={onSave}
+                            >
+                                <SendIcon height={20} width={20} />
+                                Send
+                            </button>
+                        )}
+                    </div>
+                </>
+            )}
 
             {/* Add Recipient Modal */}
             {showAddRecipientModal && (

@@ -638,37 +638,6 @@ const App = () => {
                                     isSharedDocument={isSharedDocument}
                                 />
                             </div>
-                            {!isSharedDocument && isAssignmentMode && (
-                                <div className="assignment-mode-footer">
-                                    <div className="assignment-info">
-                                        <span className="assignment-title">
-                                            Assign Recipients to All Fields
-                                        </span>
-                                        <span className="assignment-count">
-                                            {
-                                                textBoxes.filter(
-                                                    (tb) => tb.recipientId
-                                                ).length
-                                            }{" "}
-                                            of {textBoxes.length} assigned
-                                        </span>
-                                    </div>
-                                    <div className="assignment-actions">
-                                        <button
-                                            className="assignment-btn assignment-cancel"
-                                            onClick={handleCancelAssignment}
-                                        >
-                                            Cancel
-                                        </button>
-                                        <button
-                                            className="assignment-btn assignment-confirm"
-                                            onClick={handleCompleteAssignment}
-                                        >
-                                            Save PDF
-                                        </button>
-                                    </div>
-                                </div>
-                            )}
                         </>
                     ) : (
                         <p>Loading PDF from storage...</p>
@@ -681,6 +650,11 @@ const App = () => {
                         setReciepentModal={setReciepentModal}
                         templateId={1}
                         onRecipientUpdate={handleUpdateRecipients}
+                        isAssignmentMode={isAssignmentMode}
+                        assignedCount={textBoxes.filter((tb) => tb.recipientId).length}
+                        totalFields={textBoxes.length}
+                        onCancelAssignment={handleCancelAssignment}
+                        onCompleteAssignment={handleCompleteAssignment}
                     />
                 )}
             </div>
