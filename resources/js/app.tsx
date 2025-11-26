@@ -38,6 +38,7 @@ const App = () => {
         recipientId?: number | null;
         imageUrl?: string;
         imageData?: string;
+        isSubmitted?: boolean;
     }
 
     interface Recipient {
@@ -170,6 +171,7 @@ const App = () => {
                                 height: field.height,
                                 recipientId: null, // Fields are already assigned to this recipient
                                 imageData: field.imageData, // Include imageData directly in textBox
+                                isSubmitted: field.isSubmitted || false, // Include submission status
                             };
 
                             // Also store in localStorage as fallback for the PDFViewer to access
@@ -253,6 +255,7 @@ const App = () => {
                                             height: field.height,
                                             recipientId: recipient.recipient_id,
                                             imageData: field.imageData, // Include imageData from database
+                                            isSubmitted: field.isSubmitted || false, // Include submission status from database
                                         };
 
                                         // If field has imageData, store it in localStorage as fallback
@@ -370,6 +373,10 @@ const App = () => {
         setTextBoxes((prev) =>
             prev.map((tb) => (tb.id === id ? { ...tb, width, height } : tb))
         );
+    const updateTextBoxData = (id: string, data: Partial<TextBox>) =>
+        setTextBoxes((prev) =>
+            prev.map((tb) => (tb.id === id ? { ...tb, ...data } : tb))
+        );
     const removeTextBox = (id: string) =>
         setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
@@ -433,8 +440,8 @@ const App = () => {
             const fieldsWithImages = textBoxes.map((tb) => {
                 const fieldData: any = { ...tb };
 
-                // Include imageData for signature and stamp fields
-                if (tb.fieldType === "signature" || tb.fieldType === "stamp") {
+                // Include imageData for signature, stamp, and initials fields
+                if (tb.fieldType === "signature" || tb.fieldType === "stamp" || tb.fieldType === "initials") {
                     const imageKey = `pdf-image-${pdfUrl}-${tb.id}`;
                     const imageData = localStorage.getItem(imageKey);
                     if (imageData) {
@@ -527,7 +534,7 @@ const App = () => {
         }
 
         try {
-            // Prepare fields data for API, including image data
+            // Prepare fields data for API, including image data and submission status
             const fieldsData = textBoxes.map((tb) => {
                 const fieldData: any = {
                     id: tb.id,
@@ -538,10 +545,11 @@ const App = () => {
                     y: tb.y,
                     width: tb.width,
                     height: tb.height,
+                    isSubmitted: true, // Mark as submitted when saving
                 };
 
-                // Include image data for signature and stamp fields
-                if (tb.fieldType === "signature" || tb.fieldType === "stamp") {
+                // Include image data for signature, stamp, and initials fields
+                if (tb.fieldType === "signature" || tb.fieldType === "stamp" || tb.fieldType === "initials") {
                     const imageKey = `pdf-image-${pdfUrl}-${tb.id}`;
                     const imageData = localStorage.getItem(imageKey);
                     if (imageData) {
@@ -553,6 +561,12 @@ const App = () => {
             });
 
             await saveRecipientFieldValues(sharedToken, fieldsData);
+            
+            // Mark all fields as submitted
+            setTextBoxes((prev) =>
+                prev.map((tb) => ({ ...tb, isSubmitted: true }))
+            );
+            
             toast.success("Field values saved successfully!");
         } catch (error: any) {
             console.error("Error saving field values:", error);
@@ -604,6 +618,7 @@ const App = () => {
                                     fileUrl={pdfUrl}
                                     textBoxes={textBoxes}
                                     updateTextBox={updateTextBox}
+                                    updateTextBoxData={updateTextBoxData}
                                     moveTextBox={moveTextBox}
                                     addTextBox={addTextBox}
                                     removeTextBox={removeTextBox}

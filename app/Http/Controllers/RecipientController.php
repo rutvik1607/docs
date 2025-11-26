@@ -247,36 +247,6 @@ class RecipientController extends Controller
             $now = now();
 
             // ----------------------------------
-            // GET DOCUMENT NAME (from request or use default)
-            // ----------------------------------
-            $documentName = $request->document_name ?? $request->file_name ?? 'Document';
-
-            // ----------------------------------
-            // GET SENDER RECIPIENT DATA (sender is a recipient with id = user_id)
-            // ----------------------------------
-            $senderRecipient = DB::table('recipients')
-                ->where('id', $userId)
-                ->where('status', 1)
-                ->select('id', 'first_name', 'last_name', 'email')
-                ->first();
-
-            if (!$senderRecipient) {
-                return response()->json([
-                    'status'     => false,
-                    'error_code' => 404,
-                    'message'    => 'Sender recipient not found'
-                ], 404);
-            }
-
-            // Create sender object with full name
-            $senderName = trim(($senderRecipient->first_name ?? '') . ' ' . ($senderRecipient->last_name ?? ''));
-            $sender = (object)[
-                'id' => $senderRecipient->id,
-                'name' => $senderName ?: 'Someone',
-                'email' => $senderRecipient->email
-            ];
-
-            // ----------------------------------
             // CHECK — recipients belong to user
             // ----------------------------------
             $recipients = DB::table('recipients')
@@ -312,13 +282,7 @@ class RecipientController extends Controller
                     'updated_at'  => $now
                 ];
 
-                $recipientData = (object)[
-                    'id' => $rec->id,
-                    'email' => $rec->email,
-                    'first_name' => $rec->first_name
-                ];
 
-                Mail::to($rec->email)->send(new ShareRecipientMail($sender, $recipientData, $secureLink, $documentName));
             }
 
             DB::table('share_recipients')->insert($insertData);
@@ -502,6 +466,11 @@ class RecipientController extends Controller
                     // Update imageData for signature/stamp fields
                     if (isset($matchingField['imageData'])) {
                         $existingField['imageData'] = $matchingField['imageData'];
+                    }
+                    
+                    // Update isSubmitted status
+                    if (isset($matchingField['isSubmitted'])) {
+                        $existingField['isSubmitted'] = $matchingField['isSubmitted'];
                     }
                 }
                 $updatedFields[] = $existingField;

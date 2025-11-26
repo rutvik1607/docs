@@ -5,6 +5,7 @@ import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import { BillingIcon, DateIcon, SignatureIcon, StampPlaceholderIcon } from "./Icons";
 import SignatureStampUploadModal from "./SignatureStampUploadModal";
+import SignatureDrawModal from "./SignatureDrawModal";
 
 interface TextBox {
     id: string;
@@ -39,6 +40,7 @@ interface PdfViewerProps {
     selectedTextBoxId: string | null;
     onDocumentLoadSuccess?: (pdf: any) => void;
     updateTextBox: (id: string, content: string) => void;
+    updateTextBoxData?: (id: string, data: Partial<TextBox>) => void;
     isAssignmentMode?: boolean;
     recipients?: Recipient[];
     onUpdateTextBox?: (id: string, recipientId: number | null) => void;
@@ -56,6 +58,7 @@ export default function PdfViewer({
     selectedTextBoxId,
     onDocumentLoadSuccess,
     updateTextBox,
+    updateTextBoxData,
     isAssignmentMode = false,
     recipients = [],
     onUpdateTextBox,
@@ -72,6 +75,9 @@ export default function PdfViewer({
     const [showUploadModal, setShowUploadModal] = useState(false);
     const [uploadingFieldId, setUploadingFieldId] = useState<string | null>(null);
     const [uploadingFieldType, setUploadingFieldType] = useState<"signature" | "stamp">("signature");
+    const [showDrawModal, setShowDrawModal] = useState(false);
+    const [drawingFieldId, setDrawingFieldId] = useState<string | null>(null);
+    const [drawingFieldType, setDrawingFieldType] = useState<"signature" | "initials">("signature");
     const draggingRef = useRef<{
         id: string;
         page: number;
@@ -90,6 +96,7 @@ export default function PdfViewer({
         origWidth: number;
         origHeight: number;
     } | null>(null);
+    const previouslySelectedRef = useRef<string | null>(null);
 
     useEffect(() => {
         setLoadError(null);
@@ -134,11 +141,11 @@ export default function PdfViewer({
                 const imageKey = `pdf-image-${fileUrl}-${textBoxId}`;
                 localStorage.setItem(imageKey, imageUrl);
 
-                const updatedTextBoxes = textBoxes.map(tb =>
-                    tb.id === textBoxId ? { ...tb, imageData: imageUrl } : tb
-                );
-
-                updateTextBox(textBoxId, textBox.content);
+                if (updateTextBoxData) {
+                    updateTextBoxData(textBoxId, { imageData: imageUrl });
+                } else {
+                    updateTextBox(textBoxId, textBox.content);
+                }
             }
             setUploadingImage(null);
         };
@@ -175,6 +182,29 @@ export default function PdfViewer({
         }
     };
 
+    const openDrawModal = (textBoxId: string, fieldType: "signature" | "initials") => {
+        setDrawingFieldId(textBoxId);
+        setDrawingFieldType(fieldType);
+        setShowDrawModal(true);
+    };
+
+    const handleDrawSave = (imageData: string) => {
+        if (drawingFieldId) {
+            const imageKey = `pdf-image-${fileUrl}-${drawingFieldId}`;
+            localStorage.setItem(imageKey, imageData);
+            const textBox = textBoxes.find(tb => tb.id === drawingFieldId);
+            if (textBox) {
+                if (updateTextBoxData) {
+                    updateTextBoxData(drawingFieldId, { imageData: imageData });
+                } else {
+                    updateTextBox(drawingFieldId, textBox.content);
+                }
+            }
+            setShowDrawModal(false);
+            setDrawingFieldId(null);
+        }
+    };
+
     const getImageUrl = (textBoxId: string): string | undefined => {
         // First check if textBox has imageData property (from server/shared view)
         const textBox = textBoxes.find(tb => tb.id === textBoxId);
@@ -194,6 +224,14 @@ export default function PdfViewer({
                 fieldType={uploadingFieldType}
                 onClose={() => setShowUploadModal(false)}
                 onUpload={handleModalUpload}
+                currentImageUrl={uploadingFieldId ? getImageUrl(uploadingFieldId) : undefined}
+            />
+            <SignatureDrawModal
+                isOpen={showDrawModal}
+                fieldType={drawingFieldType}
+                onClose={() => setShowDrawModal(false)}
+                onSave={handleDrawSave}
+                currentImageUrl={drawingFieldId ? getImageUrl(drawingFieldId) : undefined}
             />
             <input
                 ref={fileInputRef}
@@ -274,14 +312,14 @@ export default function PdfViewer({
                                             width = width + 120; // wider, resizable container for billing details
                                             height = 36;
                                         } else if (fieldType === "initials") {
-                                            width = width + 42; // square-ish for initials
-                                            height = 36;
-                                        } else if (fieldType === "text") {
-                                            width = width + 80; // square-ish for initials
+                                            width = 109;
+                                            height = 66;
+                                        } else if (fieldType === "text" || fieldType === "date") {
+                                            width = 160; // square-ish for initials
                                             height = 36;
                                         } else if (fieldType === "signature") {
-                                            width = 200; // wider for signature
-                                            height = 80;
+                                            width = 190;
+                                            height = 68;
                                         } else if (fieldType === "stamp") {
                                             width = 120; // square-ish for stamp
                                             height = 120;
@@ -329,6 +367,7 @@ export default function PdfViewer({
                                             const top = tb.y * scale;
 
                                             const onPointerDown = (e: React.PointerEvent) => {
+                                                previouslySelectedRef.current = selectedTextBoxId;
                                                 (e.target as Element).setPointerCapture(e.pointerId);
                                                 draggingRef.current = {
                                                     id: tb.id,
@@ -413,12 +452,14 @@ export default function PdfViewer({
                                             const isBilling = tb.fieldType === "billing";
                                             const isInitials = tb.fieldType === "initials";
                                             const isTextBox = tb.fieldType === "text";
+                                            const isDate = tb.fieldType === "date";
                                             const isSignature = tb.fieldType === "signature";
                                             const isStamp = tb.fieldType === "stamp";
-                                            const hasImage = (isSignature || isStamp) && getImageUrl(tb.id);
+                                            const hasImage = (isSignature || isStamp || isInitials) && getImageUrl(tb.id);
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
-                                            const backgroundColor = isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566";
                                             const isSubmitted = tb.isSubmitted === true;
+                                            const backgroundColor = isSubmitted ? 'transparent' : (isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566");
+                                            const isLocked = tb.recipientId != null && !isAssignmentMode;
                                             return (
                                                 <div
                                                     key={tb.id}
@@ -428,41 +469,40 @@ export default function PdfViewer({
                                                         top,
                                                         zIndex: 10,
                                                     }}
-                                                    onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted ? onPointerDown : undefined}
+                                                    onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted && !isLocked ? onPointerDown : undefined}
                                                 >
                                                     <div
                                                         style={{
-                                                            background: isSubmitted ? 'transparent' : (hasImage ? 'transparent' : backgroundColor),
-                                                            width: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.width : 'auto',
-                                                            height: (isBilling || isInitials || isTextBox || isSignature || isStamp) ? tb.height || 36 : 'auto',
+                                                            background: hasImage ? 'transparent' : backgroundColor,
+                                                            width: isSubmitted && hasImage ? 'auto' : ((isBilling || isInitials || isTextBox || isSignature || isStamp || isDate) ? tb.width : 'auto'),
+                                                            height: isSubmitted && hasImage ? 'auto' : ((isBilling || isInitials || isTextBox || isSignature || isStamp || isDate) ? tb.height || 36 : 'auto'),
                                                             display: "flex",
                                                             alignItems: "center",
                                                             justifyContent: "center",
                                                             border: isSubmitted
                                                                 ? 'none'
                                                                 : (hasImage
-                                                                    ? '1px solid #d1d5db'
+                                                                    ? '0.5px solid #d1d5db'
                                                                     : (tb.id === selectedTextBoxId || isAssignmentMode
-                                                                        ? `2px solid ${borderColor}`
+                                                                        ? `0.5px solid ${borderColor}`
                                                                         : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`)),
-                                                            borderRadius: "4px",
-                                                            padding: isSubmitted ? "0" : ((hasImage || isSignature || isStamp) ? "0" : "4px 8px"),
+                                                            borderRadius: isSubmitted ? "0" : "4px",
+                                                            padding: isSubmitted ? "0" : ((hasImage || isSignature || isStamp) ? "0" : "4px"),
                                                             color: "rgb(36,133,103)",
                                                             fontWeight: "bold",
                                                             fontSize: "14px",
                                                             fontFamily: "monospace",
-                                                            cursor: isSubmitted ? "default" : (isAssignmentMode ? "default" : (isSharedDocument ? "pointer" : "move")),
+                                                            cursor: isSubmitted ? "default" : (isAssignmentMode ? "default" : (isLocked ? "not-allowed" : (isSharedDocument ? "pointer" : "move"))),
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
                                                         }}
-                                                        onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted ? (e) => {
-                                                            // Allow dragging from the border/padding area of date fields
-                                                            const target = e.target as HTMLElement;
-                                                            if (target.style.cursor === 'pointer') {
-                                                                // Clicked on the date content, don't drag
+                                                        onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted && !isLocked ? (e) => {
+                                                            const isDateOrInitials = tb.fieldType === 'date' || tb.fieldType === 'initials';
+                                                            setSelectedTextBoxId(tb.id);
+                                                            if (isDateOrInitials) {
                                                                 return;
                                                             }
-                                                            // Clicked on border/padding, allow drag
+                                                            // Allow dragging from border/padding
                                                             onPointerDown(e);
                                                         } : undefined}
                                                     >
@@ -470,63 +510,38 @@ export default function PdfViewer({
                                                         {(isSignature || isStamp) ? (
                                                             getImageUrl(tb.id) ? (
                                                                 <div
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                            openUploadModal(tb.id, isSignature ? "signature" : "stamp");
+                                                                        }
+                                                                    }}
                                                                     style={{
-                                                                        width: '100%',
-                                                                        height: '100%',
+                                                                        width: isSubmitted ? (tb.width ? tb.width + 'px' : 'auto') : '100%',
+                                                                        height: isSubmitted ? (tb.height ? tb.height + 'px' : 'auto') : '100%',
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
                                                                         position: 'relative',
+                                                                        cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                     }}
                                                                 >
                                                                     <img
                                                                         src={getImageUrl(tb.id)}
                                                                         alt={isSignature ? "Signature" : "Stamp"}
                                                                         style={{
-                                                                            maxWidth: tb.width ? `${tb.width}px` : '100%',
-                                                                            maxHeight: tb.height ? `${tb.height}px` : '100%',
-                                                                            width: 'auto',
-                                                                            height: 'auto',
+                                                                            width: isSubmitted ? (tb.width ? tb.width + 'px' : 'auto') : '100%',
+                                                                            height: isSubmitted ? (tb.height ? tb.height + 'px' : 'auto') : '100%',
                                                                             objectFit: 'contain',
                                                                             pointerEvents: 'none',
                                                                         }}
                                                                     />
-                                                                    {!isAssignmentMode && !isSubmitted && !isSharedDocument && (
-                                                                        <div
-                                                                            style={{
-                                                                                position: 'absolute',
-                                                                                bottom: '4px',
-                                                                                left: '4px',
-                                                                                display: 'flex',
-                                                                                gap: '4px',
-                                                                            }}
-                                                                        >
-                                                                            <button
-                                                                                onClick={(e) => {
-                                                                                    e.stopPropagation();
-                                                                                    removeImage(tb.id);
-                                                                                }}
-                                                                                style={{
-                                                                                    padding: '4px 8px',
-                                                                                    fontSize: '10px',
-                                                                                    background: '#ef4444',
-                                                                                    color: 'white',
-                                                                                    border: 'none',
-                                                                                    borderRadius: '3px',
-                                                                                    cursor: 'pointer',
-                                                                                }}
-                                                                                title="Remove image"
-                                                                            >
-                                                                                ×
-                                                                            </button>
-                                                                        </div>
-                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <div
-                                                                    onDoubleClick={(e) => {
+                                                                    onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (!isAssignmentMode && !isSubmitted) {
+                                                                        if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
                                                                             openUploadModal(tb.id, isSignature ? "signature" : "stamp");
                                                                         }
                                                                     }}
@@ -536,7 +551,7 @@ export default function PdfViewer({
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        cursor: isAssignmentMode || isSubmitted ? 'default' : 'pointer',
+                                                                        cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                         color: tb.content ? '#2f7d6f' : 'inherit',
                                                                     }}
                                                                 >
@@ -545,11 +560,60 @@ export default function PdfViewer({
                                                                     {isSignature ? "Signature" : "Stamp"}
                                                                 </div>
                                                             )
+                                                        ) : (isInitials && getImageUrl(tb.id)) ? (
+                                                            <div
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                        openDrawModal(tb.id, "initials");
+                                                                    }
+                                                                }}
+                                                                style={{
+                                                                    width: isSubmitted ? (tb.width ? tb.width + 'px' : 'auto') : '100%',
+                                                                    height: isSubmitted ? (tb.height ? tb.height + 'px' : 'auto') : '100%',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    position: 'relative',
+                                                                    cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                }}
+                                                            >
+                                                                <img
+                                                                    src={getImageUrl(tb.id)}
+                                                                    alt="Initials"
+                                                                    style={{
+                                                                        width: isSubmitted ? (tb.width ? tb.width + 'px' : 'auto') : '100%',
+                                                                        height: isSubmitted ? (tb.height ? tb.height + 'px' : 'auto') : '100%',
+                                                                        objectFit: 'contain',
+                                                                        pointerEvents: 'none',
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        ) : isInitials ? (
+                                                            <div
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                        openDrawModal(tb.id, "initials");
+                                                                    }
+                                                                }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                    cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                    color: '#2f7d6f',
+                                                                }}
+                                                            >
+                                                                Initials
+                                                            </div>
                                                         ) : tb.fieldType === "date" ? (
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (!isAssignmentMode && !isSubmitted) {
+                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked) {
                                                                         setShowDatePicker(tb.id);
                                                                         // Parse existing date if present
                                                                         const dateMatch = tb.content.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
@@ -561,32 +625,48 @@ export default function PdfViewer({
                                                                         }
                                                                     }
                                                                 }}
-                                                                onPointerDown={(e) => {
-                                                                    // Prevent drag when clicking on date field content
-                                                                    e.stopPropagation();
-                                                                }}
                                                                 style={{
-                                                                    width: '100%',
+                                                                    width: '160px',
                                                                     height: '100%',
                                                                     outline: 'none',
                                                                     border: 'none',
                                                                     background: 'transparent',
-                                                                    color: 'inherit',
+                                                                    color: isSubmitted ? '#000' : 'inherit',
                                                                     font: 'inherit',
+                                                                    fontWeight: isSubmitted ? 'normal' : 'inherit',
+                                                                    fontFamily: isSubmitted ? 'Arial, sans-serif' : 'inherit',
                                                                     whiteSpace: 'pre-wrap',
                                                                     overflowWrap: 'anywhere',
                                                                     lineHeight: '1.2',
-                                                                    cursor: isSubmitted ? 'default' : 'pointer',
+                                                                    cursor: isSubmitted || isLocked ? 'default' : 'pointer',
                                                                     display: 'flex',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
-                                                                    padding: '4px 5px',
-                                                                    pointerEvents: isSubmitted ? 'none' : 'auto',
+                                                                    padding: '4px',
+                                                                    pointerEvents: isSubmitted || isLocked ? 'none' : 'auto',
                                                                     gap: '4px',
                                                                 }}
                                                             >
                                                                 {(tb.content !== 'date' && tb.content) || 'Select Date'}
                                                                 {!isSubmitted && <DateIcon />}
+                                                            </div>
+                                                        ) : isSubmitted ? (
+                                                            <div
+                                                                style={{
+                                                                    width: '100%',
+                                                                    height: '100%',
+                                                                    color: '#000',
+                                                                    fontSize: '14px',
+                                                                    fontWeight: 'normal',
+                                                                    fontFamily: 'Arial, sans-serif',
+                                                                    whiteSpace: 'pre-wrap',
+                                                                    wordWrap: 'break-word',
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'center',
+                                                                }}
+                                                            >
+                                                                {tb.content}
                                                             </div>
                                                         ) : (
                                                             <>
@@ -594,15 +674,14 @@ export default function PdfViewer({
                                                                 value={tb.content}
                                                                 placeholder={
                                                                     tb.fieldType === "signature" ? "Signature" :
-                                                                    tb.fieldType === "initials" ? "Initials" :
                                                                     tb.fieldType === "stamp" ? "Stamp" :
                                                                     tb.fieldType === "billing" ? "Billing details" :
                                                                     "Enter value"
                                                                 }
-                                                                readOnly={isAssignmentMode || isSubmitted}
+                                                                readOnly={isAssignmentMode || isSubmitted || isLocked}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => {
-                                                                    if (!isAssignmentMode && !isSubmitted) {
+                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked) {
                                                                         updateTextBox(tb.id, e.target.value);
                                                                     }
                                                                 }}
@@ -624,7 +703,7 @@ export default function PdfViewer({
                                                                     fontSize: '14px',
                                                                     fontWeight: 'bold',
                                                                     fontFamily: 'monospace',
-                                                                    cursor: isAssignmentMode ? 'default' : 'text',
+                                                                    cursor: isAssignmentMode || isLocked ? 'default' : 'text',
                                                                     padding: '0',
                                                                     direction: 'ltr',
                                                                     textAlign: 'center',
@@ -706,16 +785,16 @@ export default function PdfViewer({
                                                                 </select>
                                                             </div>
                                                         )}
-                                                        {tb.id === selectedTextBoxId && !isSharedDocument && !isSubmitted && (
+                                                        {tb.id === selectedTextBoxId && !isSharedDocument && !isSubmitted && !isLocked && !isAssignmentMode && (
                                                             <>
                                                                 {(isBilling || isInitials || isTextBox || isSignature || isStamp) && (
                                                                     <div
                                                                         style={{
                                                                             position: "absolute",
-                                                                            right: -5,
-                                                                            bottom: -5,
-                                                                            width: 10,
-                                                                            height: 10,
+                                                                            right: -3,
+                                                                            bottom: -3,
+                                                                            width: 7,
+                                                                            height: 7,
                                                                             background: "#49806e",
                                                                             cursor: "se-resize",
                                                                             borderRadius: "2px",

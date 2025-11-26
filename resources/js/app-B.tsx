@@ -56,6 +56,7 @@ const App = () => {
     const updateTextBox = (id: string, content: string) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, content } : tb)));
     const moveTextBox = (id: string, x: number, y: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, x, y } : tb)));
     const resizeTextBox = (id: string, width: number, height: number) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, width, height } : tb)));
+    const updateTextBoxData = (id: string, data: Partial<TextBox>) => setTextBoxes((prev) => prev.map((tb) => (tb.id === id ? { ...tb, ...data } : tb)));
     const removeTextBox = (id: string) => setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
 
@@ -197,6 +198,7 @@ const App = () => {
                                 fileUrl={pdfUrl}
                                 textBoxes={textBoxes}
                                 updateTextBox={updateTextBox}
+                                updateTextBoxData={updateTextBoxData}
                                 moveTextBox={moveTextBox}
                                 addTextBox={addTextBox}
                                 removeTextBox={removeTextBox}

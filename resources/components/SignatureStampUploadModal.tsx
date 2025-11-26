@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { toast } from "react-toastify";
 
 interface SignatureStampUploadModalProps {
@@ -7,6 +7,7 @@ interface SignatureStampUploadModalProps {
     onClose: () => void;
     onUpload: (file: File) => void;
     isLoading?: boolean;
+    currentImageUrl?: string;
 }
 
 const SignatureStampUploadModal = ({
@@ -15,10 +16,17 @@ const SignatureStampUploadModal = ({
     onClose,
     onUpload,
     isLoading = false,
+    currentImageUrl,
 }: SignatureStampUploadModalProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [preview, setPreview] = useState<string | null>(null);
+    const [preview, setPreview] = useState<string | null>(currentImageUrl || null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+    useEffect(() => {
+        if (isOpen && currentImageUrl) {
+            setPreview(currentImageUrl);
+        }
+    }, [isOpen, currentImageUrl]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -47,7 +55,7 @@ const SignatureStampUploadModal = ({
     };
 
     const resetModal = () => {
-        setPreview(null);
+        setPreview(currentImageUrl || null);
         setSelectedFile(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = "";
@@ -83,16 +91,16 @@ const SignatureStampUploadModal = ({
                 </header>
 
                 <div className="signature-stamp-content">
-                    {!preview ? (
+                    <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="signature-stamp-file-input"
+                        disabled={isLoading}
+                    />
+                    {!preview && !currentImageUrl ? (
                         <div className="signature-stamp-upload-area">
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileChange}
-                                className="signature-stamp-file-input"
-                                disabled={isLoading}
-                            />
                             <label
                                 htmlFor="file-input"
                                 className="signature-stamp-upload-label"
@@ -122,7 +130,7 @@ const SignatureStampUploadModal = ({
                     ) : (
                         <div className="signature-stamp-preview-area">
                             <img
-                                src={preview}
+                                src={preview || currentImageUrl || ""}
                                 alt="Preview"
                                 className="signature-stamp-preview"
                             />
@@ -132,7 +140,7 @@ const SignatureStampUploadModal = ({
                                 onClick={() => fileInputRef.current?.click()}
                                 disabled={isLoading}
                             >
-                                Change File
+                                {selectedFile ? "Change File" : "Select Different File"}
                             </button>
                         </div>
                     )}
