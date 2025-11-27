@@ -767,6 +767,15 @@ textarea::placeholder {
     background: #1f6d54;
 }
 
+.recipient-submitted-label {
+    border: 1px solid #248567;
+    color: #248567;
+    padding: 10px 24px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 14px;
+}
+
 .assignment-mode-footer {
     position: fixed;
     bottom: 0;

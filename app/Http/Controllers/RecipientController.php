@@ -332,9 +332,77 @@ class RecipientController extends Controller
             $recipients = DB::table('share_recipients')
                 ->join('recipients', 'share_recipients.recipient_id', '=', 'recipients.id')
                 ->where('share_recipients.template_id', $templateId)
-                ->select('recipients.*', 'share_recipients.date')
+                ->select(
+                    'recipients.id as recipient_id',
+                    'recipients.first_name',
+                    'recipients.last_name',
+                    'recipients.email',
+                    'recipients.phone',
+                    'recipients.postal_code',
+                    'recipients.status as recipient_status',
+                    'recipients.created_at as recipient_created_at',
+                    'recipients.updated_at as recipient_updated_at',
+                    'share_recipients.id as share_recipient_id',
+                    'share_recipients.template_id',
+                    'share_recipients.user_id',
+                    'share_recipients.token',
+                    'share_recipients.field_json',
+                    'share_recipients.date',
+                    'share_recipients.created_at as share_created_at',
+                    'share_recipients.updated_at as share_updated_at'
+                )
                 ->orderBy('share_recipients.id', 'DESC')
-                ->get();
+                ->get()
+                ->map(function ($item) {
+                    $fields = [];
+                    if (!empty($item->field_json)) {
+                        $decoded = json_decode($item->field_json, true);
+                        if (is_array($decoded)) {
+                            $fields = $decoded;
+                        }
+                    }
+
+                    $submittedFields = array_values(array_filter($fields, function ($field) {
+                        if (!is_array($field)) {
+                            return false;
+                        }
+                        if (array_key_exists('isSubmitted', $field)) {
+                            return (bool) $field['isSubmitted'];
+                        }
+                        if (!empty($field['content'])) {
+                            return true;
+                        }
+                        if (!empty($field['imageData'])) {
+                            return true;
+                        }
+                        return false;
+                    }));
+
+                    return [
+                        'id' => $item->recipient_id,
+                        'first_name' => $item->first_name,
+                        'last_name' => $item->last_name,
+                        'email' => $item->email,
+                        'phone' => $item->phone,
+                        'postal_code' => $item->postal_code,
+                        'status' => $item->recipient_status,
+                        'created_at' => $item->recipient_created_at,
+                        'updated_at' => $item->recipient_updated_at,
+                        'template_id' => $item->template_id,
+                        'share_recipient_id' => $item->share_recipient_id,
+                        'token' => $item->token,
+                        'link' => $item->token ? route('shared.document.link', $item->token) : null,
+                        'assigned_at' => $item->share_created_at,
+                        'last_activity_at' => $item->share_updated_at,
+                        'date' => $item->date,
+                        'fields' => $fields,
+                        'submitted_fields' => $submittedFields,
+                        'submitted_field_count' => count($submittedFields),
+                        'total_fields' => count($fields),
+                        'is_fully_submitted' => count($fields) > 0 && count($fields) === count($submittedFields),
+                    ];
+                })
+                ->values();
 
             return response()->json([
                 'status'       => true,
@@ -376,12 +444,50 @@ class RecipientController extends Controller
                 return "Invalid user";
             }
 
-            // Get assigned fields from field_json
+            $templateId = $shareRecipient->template_id;
+
+            $shareAssignments = DB::table('share_recipients')
+                ->join('recipients', 'share_recipients.recipient_id', '=', 'recipients.id')
+                ->where('share_recipients.template_id', $templateId)
+                ->select(
+                    'share_recipients.recipient_id',
+                    'share_recipients.field_json',
+                    'recipients.first_name',
+                    'recipients.last_name',
+                    'recipients.email'
+                )
+                ->get();
+
             $assignedFields = [];
-            if (!empty($shareRecipient->field_json)) {
-                $assignedFields = json_decode($shareRecipient->field_json, true);
-                if (!is_array($assignedFields)) {
-                    $assignedFields = [];
+            foreach ($shareAssignments as $assignment) {
+                if (empty($assignment->field_json)) {
+                    continue;
+                }
+
+                $fields = json_decode($assignment->field_json, true);
+                if (!is_array($fields)) {
+                    continue;
+                }
+
+                foreach ($fields as $field) {
+                    if (!is_array($field)) {
+                        continue;
+                    }
+
+                    $isSubmitted = isset($field['isSubmitted'])
+                        ? (bool) $field['isSubmitted']
+                        : (!empty($field['content']) || !empty($field['imageData']));
+
+                    if ($assignment->recipient_id !== $shareRecipient->recipient_id && !$isSubmitted) {
+                        continue;
+                    }
+
+                    $field['recipientId'] = $assignment->recipient_id;
+                    $field['recipientName'] = trim(($assignment->first_name ?? '') . ' ' . ($assignment->last_name ?? ''));
+                    $field['recipientEmail'] = $assignment->email ?? '';
+                    $field['isSubmitted'] = $isSubmitted;
+
+                    $assignedFields[] = $field;
                 }
             }
 

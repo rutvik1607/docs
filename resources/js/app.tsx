@@ -2,7 +2,7 @@ import "./bootstrap";
 import "../css/app.css";
 
 import ReactDOM from "react-dom/client";
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useMemo } from "react";
 import { pdfjs } from "react-pdf";
 import PdfViewer from "../components/PDFViewer";
 import RightSidebar from "../components/RightSidebar";
@@ -39,6 +39,9 @@ const App = () => {
         imageUrl?: string;
         imageData?: string;
         isSubmitted?: boolean;
+        recipientName?: string;
+        recipientEmail?: string;
+        isEditableByCurrentRecipient?: boolean;
     }
 
     interface Recipient {
@@ -60,6 +63,7 @@ const App = () => {
     const [isAssignmentMode, setIsAssignmentMode] = useState(false);
     const [recipients, setRecipients] = React.useState<Recipient[]>([]);
     const [isSharedDocument, setIsSharedDocument] = React.useState(false);
+    const [activeRecipientId, setActiveRecipientId] = React.useState<number | null>(null);
     const [sharedToken, setSharedToken] = React.useState<string | null>(null);
     const [isLoadingTemplateData, setIsLoadingTemplateData] =
         React.useState(false);
@@ -145,6 +149,9 @@ const App = () => {
                 const sharedData = getSharedData();
                 console.log("Shared data:", sharedData);
 
+                const currentSharedRecipientId = sharedData?.recipient?.id ?? null;
+                setActiveRecipientId(currentSharedRecipientId);
+
                 if (sharedData && sharedData.token) {
                     setSharedToken(sharedData.token);
                 }
@@ -156,8 +163,28 @@ const App = () => {
                     sharedData.assignedFields.length > 0
                 ) {
                     // Convert assigned fields to TextBox format
+                    const filteredAssignedFields = sharedData.assignedFields.filter((field: any) => {
+                        const ownerRecipientId = field.recipientId != null
+                            ? Number(field.recipientId)
+                            : null;
+                        if (ownerRecipientId === null || ownerRecipientId === currentSharedRecipientId) {
+                            return true;
+                        }
+                        const resolvedContent = typeof field.content === "string" ? field.content.trim() : "";
+                        const hasContent = resolvedContent.length > 0;
+                        const hasImageData = Boolean(field.imageData);
+                        return field.isSubmitted === true || hasContent || hasImageData;
+                    });
+
                     const fieldsAsTextBoxes: TextBox[] =
-                        sharedData.assignedFields.map((field: any) => {
+                        filteredAssignedFields.map((field: any) => {
+                            const ownerRecipientId = field.recipientId != null
+                                ? Number(field.recipientId)
+                                : null;
+                            const isEditableByRecipient = ownerRecipientId === null || ownerRecipientId === currentSharedRecipientId;
+                            const resolvedContent = field.content || "";
+                            const hasContent = Boolean(resolvedContent?.trim());
+                            const hasImageData = Boolean(field.imageData);
                             const textBox: TextBox = {
                                 id:
                                     field.id ||
@@ -165,20 +192,26 @@ const App = () => {
                                 page: field.page || 1,
                                 x: field.x || 0,
                                 y: field.y || 0,
-                                content: field.content || "",
+                                content: resolvedContent,
                                 fieldType: field.fieldType || "text",
                                 width: field.width,
                                 height: field.height,
-                                recipientId: null, // Fields are already assigned to this recipient
-                                imageData: field.imageData, // Include imageData directly in textBox
-                                isSubmitted: field.isSubmitted || false, // Include submission status
+                                recipientId: ownerRecipientId,
+                                recipientName: field.recipientName,
+                                recipientEmail: field.recipientEmail,
+                                imageData: field.imageData,
+                                isSubmitted:
+                                    field.isSubmitted === true ||
+                                    (!isEditableByRecipient && (hasContent || hasImageData)),
+                                isEditableByCurrentRecipient: isEditableByRecipient,
                             };
 
                             // Also store in localStorage as fallback for the PDFViewer to access
                             if (
                                 field.imageData &&
                                 (field.fieldType === "signature" ||
-                                    field.fieldType === "stamp")
+                                    field.fieldType === "stamp" ||
+                                    field.fieldType === "initials")
                             ) {
                                 const imageKey = `pdf-image-${storedPdfUrl}-${field.id}`;
                                 localStorage.setItem(imageKey, field.imageData);
@@ -209,6 +242,7 @@ const App = () => {
             checkSharedData();
             setTimeout(checkSharedData, 100);
         } else {
+            setActiveRecipientId(null);
             // Regular document view - load from database ONLY on initial load
             const loadTemplateDataFromDatabase = async () => {
                 // Only load if we haven't loaded from database yet
@@ -359,6 +393,24 @@ const App = () => {
             window.removeEventListener("beforeunload", handleBeforeUnload);
         };
     }, [location.pathname, pdfUrl]);
+
+    const editableRecipientFields = useMemo(() => {
+        if (!isSharedDocument) {
+            return textBoxes;
+        }
+        return textBoxes.filter((tb) => {
+            if (typeof tb.isEditableByCurrentRecipient === "boolean") {
+                return tb.isEditableByCurrentRecipient;
+            }
+            if (tb.recipientId == null) {
+                return true;
+            }
+            if (activeRecipientId == null) {
+                return false;
+            }
+            return tb.recipientId === activeRecipientId;
+        });
+    }, [textBoxes, isSharedDocument, activeRecipientId]);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
     const updateTextBox = (id: string, content: string) =>
@@ -528,14 +580,19 @@ const App = () => {
             return;
         }
 
-        if (!textBoxes || textBoxes.length === 0) {
-            toast.warning("No fields to save");
+        if (!editableRecipientFields || editableRecipientFields.length === 0) {
+            toast.info("No fields assigned to you");
+            return;
+        }
+
+        if (editableRecipientFields.every((tb) => tb.isSubmitted)) {
+            toast.info("Fields already submitted");
             return;
         }
 
         try {
             // Prepare fields data for API, including image data and submission status
-            const fieldsData = textBoxes.map((tb) => {
+            const fieldsData = editableRecipientFields.map((tb) => {
                 const fieldData: any = {
                     id: tb.id,
                     content: tb.content || "",
@@ -562,9 +619,10 @@ const App = () => {
 
             await saveRecipientFieldValues(sharedToken, fieldsData);
             
-            // Mark all fields as submitted
+            const editableIds = new Set(editableRecipientFields.map((tb) => tb.id));
+            // Mark submitted fields as completed
             setTextBoxes((prev) =>
-                prev.map((tb) => ({ ...tb, isSubmitted: true }))
+                prev.map((tb) => (editableIds.has(tb.id) ? { ...tb, isSubmitted: true } : tb))
             );
             
             toast.success("Field values saved successfully!");
@@ -575,6 +633,24 @@ const App = () => {
             );
         }
     };
+
+    const assignedFieldCount = isSharedDocument ? editableRecipientFields.length : textBoxes.length;
+    const hasAnyFields = assignedFieldCount > 0;
+    const hasPendingFields = hasAnyFields
+        ? (isSharedDocument
+            ? editableRecipientFields.some((tb) => !tb.isSubmitted)
+            : textBoxes.some((tb) => !tb.isSubmitted))
+        : false;
+    const bannerTitle = hasPendingFields
+        ? "Fill in your assigned fields"
+        : hasAnyFields
+            ? "Submission received"
+            : "No fields available";
+    const bannerSubtitle = hasPendingFields
+        ? `${assignedFieldCount} field(s) assigned to you`
+        : hasAnyFields
+            ? `${assignedFieldCount} field(s) submitted`
+            : "Reach out to the sender for access";
 
     return (
         <div className="app-container">
@@ -595,19 +671,29 @@ const App = () => {
                         <div className="recipient-submit-footer">
                             <div className="recipient-info">
                                 <span className="recipient-title">
-                                    Fill in your assigned fields
+                                    {bannerTitle}
                                 </span>
                                 <span className="recipient-count">
-                                    {textBoxes.length} field(s) assigned to you
+                                    {bannerSubtitle}
                                 </span>
                             </div>
                             <div className="recipient-actions">
-                                <button
-                                    className="recipient-submit-btn"
-                                    onClick={handleSubmitRecipientFields}
-                                >
-                                    Submit
-                                </button>
+                                {hasPendingFields ? (
+                                    <button
+                                        className="recipient-submit-btn"
+                                        onClick={handleSubmitRecipientFields}
+                                    >
+                                        Submit
+                                    </button>
+                                ) : hasAnyFields ? (
+                                    <span className="recipient-submitted-label">
+                                        Submitted
+                                    </span>
+                                ) : (
+                                    <span className="recipient-submitted-label">
+                                        Awaiting fields
+                                    </span>
+                                )}
                             </div>
                         </div>
                     )}
@@ -636,6 +722,7 @@ const App = () => {
                                     recipients={recipients}
                                     onUpdateTextBox={handleUpdateFieldRecipient}
                                     isSharedDocument={isSharedDocument}
+                                    activeRecipientId={isSharedDocument ? activeRecipientId : null}
                                 />
                             </div>
                         </>

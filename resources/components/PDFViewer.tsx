@@ -20,6 +20,9 @@ interface TextBox {
     imageUrl?: string;
     imageData?: string;
     isSubmitted?: boolean;
+    recipientName?: string;
+    recipientEmail?: string;
+    isEditableByCurrentRecipient?: boolean;
 }
 
 interface Recipient {
@@ -45,6 +48,7 @@ interface PdfViewerProps {
     recipients?: Recipient[];
     onUpdateTextBox?: (id: string, recipientId: number | null) => void;
     isSharedDocument?: boolean;
+    activeRecipientId?: number | null;
 }
 
 export default function PdfViewer({
@@ -63,6 +67,7 @@ export default function PdfViewer({
     recipients = [],
     onUpdateTextBox,
     isSharedDocument = false,
+    activeRecipientId = null,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
@@ -459,7 +464,14 @@ export default function PdfViewer({
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
                                             const isSubmitted = tb.isSubmitted === true;
                                             const backgroundColor = isSubmitted ? 'transparent' : (isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566");
-                                            const isLocked = tb.recipientId != null && !isAssignmentMode;
+                                            const sharedEditable = isSharedDocument
+                                                ? (typeof tb.isEditableByCurrentRecipient === "boolean"
+                                                    ? tb.isEditableByCurrentRecipient
+                                                    : (tb.recipientId == null || (activeRecipientId == null || tb.recipientId === activeRecipientId)))
+                                                : true;
+                                            const isLocked = isSharedDocument
+                                                ? !sharedEditable
+                                                : (tb.recipientId != null && !isAssignmentMode);
                                             return (
                                                 <div
                                                     key={tb.id}
