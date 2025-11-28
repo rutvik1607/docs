@@ -49,6 +49,7 @@ interface PdfViewerProps {
     onUpdateTextBox?: (id: string, recipientId: number | null) => void;
     isSharedDocument?: boolean;
     activeRecipientId?: number | null;
+    currentUserName?: string;
 }
 
 export default function PdfViewer({
@@ -68,6 +69,7 @@ export default function PdfViewer({
     onUpdateTextBox,
     isSharedDocument = false,
     activeRecipientId = null,
+    currentUserName,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
@@ -230,6 +232,7 @@ export default function PdfViewer({
                 onClose={() => setShowUploadModal(false)}
                 onUpload={handleModalUpload}
                 currentImageUrl={uploadingFieldId ? getImageUrl(uploadingFieldId) : undefined}
+                defaultName={currentUserName}
             />
             <SignatureDrawModal
                 isOpen={showDrawModal}
@@ -237,6 +240,7 @@ export default function PdfViewer({
                 onClose={() => setShowDrawModal(false)}
                 onSave={handleDrawSave}
                 currentImageUrl={drawingFieldId ? getImageUrl(drawingFieldId) : undefined}
+                defaultName={currentUserName}
             />
             <input
                 ref={fileInputRef}

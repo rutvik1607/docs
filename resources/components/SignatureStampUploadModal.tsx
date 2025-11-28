@@ -1,15 +1,6 @@
 import React, { useRef, useState, useEffect } from "react";
 import { toast } from "react-toastify";
-
-const FONT_OPTIONS = [
-    { value: "dancing", label: "Dancing Script", family: "'Dancing Script', cursive" },
-    { value: "great-vibes", label: "Great Vibes", family: "'Great Vibes', cursive" },
-    { value: "pacifico", label: "Pacifico", family: "'Pacifico', cursive" },
-    { value: "satisfy", label: "Satisfy", family: "'Satisfy', cursive" },
-    { value: "allura", label: "Allura", family: "'Allura', cursive" },
-    { value: "caveat", label: "Caveat", family: "'Caveat', cursive" },
-    { value: "sacramento", label: "Sacramento", family: "'Sacramento', cursive" },
-];
+import { useSignatureCanvas, FONT_OPTIONS } from "../hooks/useSignatureCanvas";
 
 interface SignatureStampUploadModalProps {
     isOpen: boolean;
@@ -18,6 +9,7 @@ interface SignatureStampUploadModalProps {
     onUpload: (file: File) => void;
     isLoading?: boolean;
     currentImageUrl?: string;
+    defaultName?: string;
 }
 
 const SignatureStampUploadModal = ({
@@ -27,17 +19,27 @@ const SignatureStampUploadModal = ({
     onUpload,
     isLoading = false,
     currentImageUrl,
+    defaultName = "",
 }: SignatureStampUploadModalProps) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const {
+        canvasRef,
+        isDrawing,
+        hasDrawn,
+        setHasDrawn,
+        initializeCanvas,
+        clearCanvas,
+        loadImageOnCanvas,
+        renderTextSignature,
+        startDrawing
+    } = useSignatureCanvas();
+
     const [preview, setPreview] = useState<string | null>(currentImageUrl || null);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [signatureMode, setSignatureMode] = useState<"upload" | "draw" | "type">(
         fieldType === "signature" ? "draw" : "upload"
     );
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [hasDrawn, setHasDrawn] = useState(false);
-    const [textInput, setTextInput] = useState("");
+    const [textInput, setTextInput] = useState(defaultName);
     const [selectedFont, setSelectedFont] = useState(FONT_OPTIONS[0].value);
 
     const isSignature = fieldType === "signature";
@@ -52,78 +54,6 @@ const SignatureStampUploadModal = ({
         }
     }, [isOpen, currentImageUrl]);
 
-    const initializeCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-            ctx.scale(dpr, dpr);
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, rect.width, rect.height);
-        }
-        setHasDrawn(false);
-    };
-
-    const clearCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, rect.width, rect.height);
-        setHasDrawn(false);
-    };
-
-    const loadImageOnCanvas = (imageUrl: string) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const img = new Image();
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            setHasDrawn(true);
-        };
-        img.src = imageUrl;
-    };
-
-    const renderTextSignature = (text: string) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        clearCanvas();
-        const trimmed = text.trim();
-        if (!trimmed) {
-            return;
-        }
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const fontOption = FONT_OPTIONS.find((font) => font.value === selectedFont);
-        const fontFamily = fontOption?.family || "'Dancing Script', cursive";
-
-        ctx.font = `170px ${fontFamily}`;
-        ctx.fillStyle = "#000";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(trimmed, rect.width / 2, rect.height / 2);
-        setHasDrawn(true);
-    };
-
     useEffect(() => {
         if (!isOpen || !isSignature || signatureMode === "upload") return;
 
@@ -133,106 +63,23 @@ const SignatureStampUploadModal = ({
                 loadImageOnCanvas(currentImageUrl);
             }
             if (signatureMode === "type" && textInput.trim()) {
-                renderTextSignature(textInput);
+                renderTextSignature(textInput, selectedFont);
             }
         }, 0);
 
         return () => clearTimeout(timer);
-    }, [isOpen, isSignature, signatureMode, currentImageUrl, textInput]);
+    }, [isOpen, isSignature, signatureMode, currentImageUrl, textInput, initializeCanvas, loadImageOnCanvas, renderTextSignature, selectedFont]);
 
     useEffect(() => {
         if (signatureMode !== "type") return;
         if (!isSignature) return;
 
         if (textInput.trim()) {
-            renderTextSignature(textInput);
+            renderTextSignature(textInput, selectedFont);
         } else {
             clearCanvas();
         }
-    }, [signatureMode, textInput, selectedFont, isSignature]);
-
-    useEffect(() => {
-        if (!isDrawing || signatureMode !== "draw") return;
-
-        const handleGlobalMove = (event: MouseEvent | TouchEvent) => {
-            const canvas = canvasRef.current;
-            if (!canvas) return;
-
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-
-            const rect = canvas.getBoundingClientRect();
-            let x: number;
-            let y: number;
-
-            if (event instanceof TouchEvent) {
-                const touch = event.touches[0];
-                x = touch.clientX - rect.left;
-                y = touch.clientY - rect.top;
-            } else {
-                x = event.clientX - rect.left;
-                y = event.clientY - rect.top;
-            }
-
-            ctx.lineTo(x, y);
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 2;
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            ctx.stroke();
-
-            if (!hasDrawn) {
-                setHasDrawn(true);
-            }
-        };
-
-        const handleGlobalEnd = () => {
-            setIsDrawing(false);
-        };
-
-        window.addEventListener("mousemove", handleGlobalMove);
-        window.addEventListener("mouseup", handleGlobalEnd);
-        window.addEventListener("touchmove", handleGlobalMove);
-        window.addEventListener("touchend", handleGlobalEnd);
-
-        return () => {
-            window.removeEventListener("mousemove", handleGlobalMove);
-            window.removeEventListener("mouseup", handleGlobalEnd);
-            window.removeEventListener("touchmove", handleGlobalMove);
-            window.removeEventListener("touchend", handleGlobalEnd);
-        };
-    }, [isDrawing, signatureMode, hasDrawn]);
-
-    const startDrawing = (
-        e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>
-    ) => {
-        if (signatureMode !== "draw") return;
-
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        e.preventDefault();
-        setIsDrawing(true);
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        let x: number;
-        let y: number;
-
-        if ("touches" in e) {
-            const touch = e.touches[0];
-            x = touch.clientX - rect.left;
-            y = touch.clientY - rect.top;
-        } else {
-            x = e.clientX - rect.left;
-            y = e.clientY - rect.top;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-    };
+    }, [signatureMode, textInput, selectedFont, isSignature, renderTextSignature, clearCanvas]);
 
     const handleSignatureModeChange = (mode: "upload" | "draw" | "type") => {
         setSignatureMode(mode);
@@ -673,8 +520,42 @@ const SignatureStampUploadModal = ({
 
                     .signature-stamp-type-controls {
                         display: flex;
-                        gap: 12px;
+                        gap: 10px;
                     }
+
+                    .signature-stamp-font-select:focus {
+                        border-color: #a2b5a1;
+                        box-shadow: 0 0 0 2px rgba(162, 181, 161, 0.1);
+                    }
+
+                    .signature-stamp-font-select option[value="dancing"] {
+                        font-family: 'Dancing Script', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="great-vibes"] {
+                        font-family: 'Great Vibes', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="pacifico"] {
+                        font-family: 'Pacifico', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="satisfy"] {
+                        font-family: 'Satisfy', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="allura"] {
+                        font-family: 'Allura', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="caveat"] {
+                        font-family: 'Caveat', cursive;
+                    }
+
+                    .signature-stamp-font-select option[value="sacramento"] {
+                        font-family: 'Sacramento', cursive;
+                    }
+
 
                     .signature-stamp-text-input {
                         flex: 1;

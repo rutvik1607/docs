@@ -1,14 +1,5 @@
-import React, { useRef, useState, useEffect } from "react";
-
-const FONT_OPTIONS = [
-    { value: "dancing", label: "Dancing Script", family: "'Dancing Script', cursive" },
-    { value: "great-vibes", label: "Great Vibes", family: "'Great Vibes', cursive" },
-    { value: "pacifico", label: "Pacifico", family: "'Pacifico', cursive" },
-    { value: "satisfy", label: "Satisfy", family: "'Satisfy', cursive" },
-    { value: "allura", label: "Allura", family: "'Allura', cursive" },
-    { value: "caveat", label: "Caveat", family: "'Caveat', cursive" },
-    { value: "sacramento", label: "Sacramento", family: "'Sacramento', cursive" },
-];
+import React, { useState, useEffect } from "react";
+import { useSignatureCanvas, FONT_OPTIONS } from "../hooks/useSignatureCanvas";
 
 interface SignatureDrawModalProps {
     isOpen: boolean;
@@ -17,6 +8,7 @@ interface SignatureDrawModalProps {
     onSave: (imageData: string) => void;
     isLoading?: boolean;
     currentImageUrl?: string;
+    defaultName?: string;
 }
 
 const SignatureDrawModal = ({
@@ -26,31 +18,23 @@ const SignatureDrawModal = ({
     onSave,
     isLoading = false,
     currentImageUrl,
+    defaultName = "",
 }: SignatureDrawModalProps) => {
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [isDrawing, setIsDrawing] = useState(false);
-    const [hasDrawn, setHasDrawn] = useState(false);
+    const {
+        canvasRef,
+        isDrawing,
+        hasDrawn,
+        setHasDrawn,
+        initializeCanvas,
+        clearCanvas,
+        loadImageOnCanvas,
+        renderTextSignature,
+        startDrawing
+    } = useSignatureCanvas();
+
     const [mode, setMode] = useState<"draw" | "type">("draw");
-    const [textInput, setTextInput] = useState("");
+    const [textInput, setTextInput] = useState(defaultName);
     const [selectedFont, setSelectedFont] = useState("dancing");
-
-    const initializeCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const dpr = window.devicePixelRatio || 1;
-        const rect = canvas.getBoundingClientRect();
-        
-        canvas.width = rect.width * dpr;
-        canvas.height = rect.height * dpr;
-        
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-            ctx.scale(dpr, dpr);
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, rect.width, rect.height);
-        }
-    };
 
     useEffect(() => {
         if (isOpen) {
@@ -59,147 +43,19 @@ const SignatureDrawModal = ({
                 if (currentImageUrl) {
                     loadImageOnCanvas(currentImageUrl);
                 }
+                // If opening in type mode or if we want to pre-fill for type mode later
+                if (defaultName && !textInput) {
+                    setTextInput(defaultName);
+                }
             }, 0);
         }
-    }, [isOpen, currentImageUrl]);
-
-    const loadImageOnCanvas = (imageUrl: string) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const img = new Image();
-        img.onload = () => {
-            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-            setHasDrawn(true);
-        };
-        img.src = imageUrl;
-    };
-
-    useEffect(() => {
-        if (!isDrawing) return;
-
-        const handleGlobalMove = (e: MouseEvent | TouchEvent) => {
-            if (!canvasRef.current) return;
-            
-            const canvas = canvasRef.current;
-            const ctx = canvas.getContext("2d");
-            if (!ctx) return;
-
-            const rect = canvas.getBoundingClientRect();
-            let x: number, y: number;
-
-            if (e instanceof TouchEvent) {
-                const touch = e.touches[0];
-                x = touch.clientX - rect.left;
-                y = touch.clientY - rect.top;
-            } else {
-                x = e.clientX - rect.left;
-                y = e.clientY - rect.top;
-            }
-
-            ctx.lineTo(x, y);
-            ctx.strokeStyle = "#000";
-            ctx.lineWidth = 2;
-            ctx.lineCap = "round";
-            ctx.lineJoin = "round";
-            ctx.stroke();
-
-            if (!hasDrawn) {
-                setHasDrawn(true);
-            }
-        };
-
-        const handleGlobalEnd = () => {
-            setIsDrawing(false);
-        };
-
-        window.addEventListener("mousemove", handleGlobalMove);
-        window.addEventListener("mouseup", handleGlobalEnd);
-        window.addEventListener("touchmove", handleGlobalMove);
-        window.addEventListener("touchend", handleGlobalEnd);
-
-        return () => {
-            window.removeEventListener("mousemove", handleGlobalMove);
-            window.removeEventListener("mouseup", handleGlobalEnd);
-            window.removeEventListener("touchmove", handleGlobalMove);
-            window.removeEventListener("touchend", handleGlobalEnd);
-        };
-    }, [isDrawing, hasDrawn]);
-
-    const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
-        if (!canvasRef.current) return;
-
-        e.preventDefault();
-        setIsDrawing(true);
-        const canvas = canvasRef.current;
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        let x: number, y: number;
-
-        if ("touches" in e) {
-            const touch = e.touches[0];
-            x = touch.clientX - rect.left;
-            y = touch.clientY - rect.top;
-        } else {
-            x = e.clientX - rect.left;
-            y = e.clientY - rect.top;
-        }
-
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-    };
-
-
-
-    const clearCanvas = () => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        const rect = canvas.getBoundingClientRect();
-        const ctx = canvas.getContext("2d");
-        if (ctx) {
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, rect.width, rect.height);
-        }
-        setHasDrawn(false);
-    };
-
-    const renderTextSignature = (text: string) => {
-        const canvas = canvasRef.current;
-        if (!canvas) return;
-
-        clearCanvas();
-        const ctx = canvas.getContext("2d");
-        if (!ctx) return;
-
-        const rect = canvas.getBoundingClientRect();
-        
-        const fontOption = FONT_OPTIONS.find(f => f.value === selectedFont);
-        const fontFamily = fontOption?.family || "'Dancing Script', cursive";
-        const fontSize = 170;
-
-        ctx.font = `${fontSize}px ${fontFamily}`;
-        ctx.fillStyle = "#000";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-
-        const x = rect.width / 2;
-        const y = rect.height / 2;
-
-        ctx.fillText(text, x, y);
-        setHasDrawn(true);
-    };
+    }, [isOpen, currentImageUrl, defaultName, initializeCanvas, loadImageOnCanvas]);
 
     useEffect(() => {
         if (mode === "type" && textInput) {
-            renderTextSignature(textInput);
+            renderTextSignature(textInput, selectedFont);
         }
-    }, [textInput, selectedFont, mode]);
+    }, [textInput, selectedFont, mode, renderTextSignature]);
 
     const handleSave = () => {
         if (!canvasRef.current || !hasDrawn) return;
@@ -415,18 +271,15 @@ const SignatureDrawModal = ({
 
                     .signature-draw-type-section {
                         display: flex;
-                        flex-direction: column;
                         gap: 10px;
                     }
 
                     .signature-draw-text-input {
+                        flex: 1;
                         padding: 10px 12px;
-                        border: 1px solid #ddd;
-                        border-radius: 4px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
                         font-size: 14px;
-                        font-family: inherit;
-                        outline: none;
-                        transition: border-color 0.2s ease-in-out;
                     }
 
                     .signature-draw-text-input:focus {
@@ -435,15 +288,13 @@ const SignatureDrawModal = ({
                     }
 
                     .signature-draw-font-select {
-                        padding: 8px 12px;
-                        border: 1px solid #ddd;
-                        border-radius: 4px;
-                        font-size: 13px;
-                        font-family: inherit;
+                        width: 200px;
+                        padding: 10px 12px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
                         background: white;
+                        font-size: 14px;
                         cursor: pointer;
-                        outline: none;
-                        transition: border-color 0.2s ease-in-out;
                     }
 
                     .signature-draw-font-select:focus {

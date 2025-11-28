@@ -22,7 +22,8 @@
                 token: @json($token ?? null),
                 assignedFields: @json($assignedFields ?? []),
                 recipient: @json($recipient ?? null),
-                template: @json($template ?? null)
+                template: @json($template ?? null),
+                allRecipientsSubmitted: @json($allRecipientsSubmitted ?? false)
             };
             console.log('Shared document data loaded:', window.sharedDocumentData);
         </script>

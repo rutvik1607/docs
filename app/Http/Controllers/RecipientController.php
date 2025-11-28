@@ -404,11 +404,16 @@ class RecipientController extends Controller
                 })
                 ->values();
 
+            $allRecipientsSubmitted = $recipients->every(function ($recipient) {
+                return $recipient['is_fully_submitted'];
+            });
+
             return response()->json([
                 'status'       => true,
                 'success_code' => 2000,
                 'message'      => 'Recipients fetched successfully',
-                'data'         => $recipients
+                'data'         => $recipients,
+                'all_recipients_submitted' => $allRecipientsSubmitted
             ], 200);
 
         } catch (Exception $e) {
@@ -495,11 +500,48 @@ class RecipientController extends Controller
             // Fetch template data if needed
             // $template = DB::table('templates')->where('id', $shareRecipient->template_id)->first();
 
+            $allRecipientsSubmitted = true;
+            foreach ($shareAssignments as $assignment) {
+                if (empty($assignment->field_json)) {
+                    // If a recipient has no fields assigned, are they "submitted"?
+                    // Assuming yes, or maybe we should skip them.
+                    // But if they have fields and field_json is empty, that's weird.
+                    // Let's assume if they have fields assigned, they must be submitted.
+                    // But here we are iterating over assignments.
+                    continue;
+                }
+
+                $fields = json_decode($assignment->field_json, true);
+                if (!is_array($fields)) {
+                    continue;
+                }
+                
+                // Check if this recipient has any fields
+                if (count($fields) > 0) {
+                     $submittedCount = 0;
+                     foreach ($fields as $field) {
+                        $isSubmitted = isset($field['isSubmitted']) && $field['isSubmitted'];
+                        $hasContent = !empty($field['content']);
+                        $hasImage = !empty($field['imageData']);
+                        
+                        if ($isSubmitted || $hasContent || $hasImage) {
+                            $submittedCount++;
+                        }
+                     }
+                     
+                     if ($submittedCount < count($fields)) {
+                         $allRecipientsSubmitted = false;
+                         break;
+                     }
+                }
+            }
+
             return view('open-document', [
                 'recipient' => $recipient,
                 'template'  => $template,
                 'token' => $token,
-                'assignedFields' => $assignedFields
+                'assignedFields' => $assignedFields,
+                'allRecipientsSubmitted' => $allRecipientsSubmitted
             ]);
 
         } catch (\Throwable $e) {
@@ -590,12 +632,46 @@ class RecipientController extends Controller
                     'updated_at' => now(),
                 ]);
 
+            // Check if all recipients have submitted
+            $templateId = $shareRecipient->template_id;
+            $shareAssignments = DB::table('share_recipients')
+                ->where('template_id', $templateId)
+                ->get();
+
+            $allRecipientsSubmitted = true;
+            foreach ($shareAssignments as $assignment) {
+                if (empty($assignment->field_json)) {
+                    continue;
+                }
+                $fields = json_decode($assignment->field_json, true);
+                if (!is_array($fields) || count($fields) === 0) {
+                    continue;
+                }
+                
+                $submittedCount = 0;
+                foreach ($fields as $field) {
+                    $isSubmitted = isset($field['isSubmitted']) && $field['isSubmitted'];
+                    $hasContent = !empty($field['content']);
+                    $hasImage = !empty($field['imageData']);
+                    
+                    if ($isSubmitted || $hasContent || $hasImage) {
+                        $submittedCount++;
+                    }
+                }
+                
+                if ($submittedCount < count($fields)) {
+                    $allRecipientsSubmitted = false;
+                    break;
+                }
+            }
+
             return response()->json([
                 'status'       => true,
                 'success_code' => 2000,
                 'message'      => 'Field values saved successfully',
                 'data'         => [
-                    'updated_fields' => count($updatedFields)
+                    'updated_fields' => count($updatedFields),
+                    'all_recipients_submitted' => $allRecipientsSubmitted
                 ]
             ], 200);
 
@@ -1042,6 +1118,27 @@ class RecipientController extends Controller
                 ];
             });
 
+            $allRecipientsSubmitted = $formattedData->every(function ($recipient) {
+                $fields = $recipient['fields'];
+                if (empty($fields)) {
+                    return false; // Or true if no fields means "submitted"? Assuming false for now if they exist but are empty, or maybe true?
+                    // Actually, if there are no fields assigned, is it submitted?
+                    // Let's check the logic in getRecipientsByTemplate:
+                    // 'is_fully_submitted' => count($fields) > 0 && count($fields) === count($submittedFields),
+                    // So if count($fields) is 0, it is NOT fully submitted.
+                }
+                
+                $submittedFields = array_filter($fields, function ($field) {
+                    if (!is_array($field)) return false;
+                    if (isset($field['isSubmitted']) && $field['isSubmitted']) return true;
+                    if (!empty($field['content'])) return true;
+                    if (!empty($field['imageData'])) return true;
+                    return false;
+                });
+                
+                return count($fields) > 0 && count($fields) === count($submittedFields);
+            });
+
             return response()->json([
                 'status'       => true,
                 'success_code' => 2000,
@@ -1050,7 +1147,8 @@ class RecipientController extends Controller
                     'template_id' => $templateId,
                     'user_id' => $userId,
                     'share_recipients' => $formattedData,
-                    'total_recipients' => $formattedData->count()
+                    'total_recipients' => $formattedData->count(),
+                    'all_recipients_submitted' => $allRecipientsSubmitted
                 ]
             ], 200);
 

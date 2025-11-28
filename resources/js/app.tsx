@@ -69,6 +69,9 @@ const App = () => {
         React.useState(false);
     const [hasLoadedFromDatabase, setHasLoadedFromDatabase] =
         React.useState(false);
+    const [isDownloadingPdf, setIsDownloadingPdf] = React.useState(false);
+    const [isAllRecipientsSubmitted, setIsAllRecipientsSubmitted] = React.useState(false);
+    const [currentUserName, setCurrentUserName] = React.useState<string>("");
 
     const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
     const rightSidebarRef = useRef<any>(null);
@@ -134,6 +137,7 @@ const App = () => {
                                     appElement.getAttribute("data-template") ||
                                         "null"
                                 ),
+                                allRecipientsSubmitted: false
                             };
                         } catch (e) {
                             console.error("Error parsing data attributes:", e);
@@ -154,6 +158,17 @@ const App = () => {
 
                 if (sharedData && sharedData.token) {
                     setSharedToken(sharedData.token);
+                }
+
+                if (sharedData?.recipient) {
+                    const { first_name, last_name } = sharedData.recipient;
+                    if (first_name || last_name) {
+                        setCurrentUserName(`${first_name || ""} ${last_name || ""}`.trim());
+                    }
+                }
+
+                if (sharedData && sharedData.allRecipientsSubmitted) {
+                    setIsAllRecipientsSubmitted(true);
                 }
 
                 if (
@@ -265,6 +280,9 @@ const App = () => {
                         response.data &&
                         response.data.share_recipients
                     ) {
+                        if (response.data.all_recipients_submitted) {
+                            setIsAllRecipientsSubmitted(true);
+                        }
                         // Collect all fields from all recipients
                         const allFields: TextBox[] = [];
 
@@ -444,6 +462,30 @@ const App = () => {
         return `{{ ${content?.trim() || ""} }}`;
     };
 
+    const convertDataUrlToBytes = (dataUrl: string) => {
+        const base64 = dataUrl.includes(",")
+            ? dataUrl.split(",")[1]
+            : dataUrl;
+        const binaryString = atob(base64);
+        const length = binaryString.length;
+        const bytes = new Uint8Array(length);
+        for (let i = 0; i < length; i += 1) {
+            bytes[i] = binaryString.charCodeAt(i);
+        }
+        return bytes;
+    };
+
+    const getFieldImageData = (textBox: TextBox) => {
+        if (textBox.imageData) {
+            return textBox.imageData;
+        }
+        if (!pdfUrl) {
+            return null;
+        }
+        const imageKey = `pdf-image-${pdfUrl}-${textBox.id}`;
+        return localStorage.getItem(imageKey);
+    };
+
     const handleRecipientCreated = async () => {
         if (rightSidebarRef.current) {
             await rightSidebarRef.current.refreshRecipients();
@@ -591,7 +633,6 @@ const App = () => {
         }
 
         try {
-            // Prepare fields data for API, including image data and submission status
             const fieldsData = editableRecipientFields.map((tb) => {
                 const fieldData: any = {
                     id: tb.id,
@@ -602,10 +643,9 @@ const App = () => {
                     y: tb.y,
                     width: tb.width,
                     height: tb.height,
-                    isSubmitted: true, // Mark as submitted when saving
+                    isSubmitted: true,
                 };
 
-                // Include image data for signature, stamp, and initials fields
                 if (tb.fieldType === "signature" || tb.fieldType === "stamp" || tb.fieldType === "initials") {
                     const imageKey = `pdf-image-${pdfUrl}-${tb.id}`;
                     const imageData = localStorage.getItem(imageKey);
@@ -617,10 +657,13 @@ const App = () => {
                 return fieldData;
             });
 
-            await saveRecipientFieldValues(sharedToken, fieldsData);
+            const response = await saveRecipientFieldValues(sharedToken, fieldsData);
+            
+            if (response.data && response.data.all_recipients_submitted) {
+                setIsAllRecipientsSubmitted(true);
+            }
             
             const editableIds = new Set(editableRecipientFields.map((tb) => tb.id));
-            // Mark submitted fields as completed
             setTextBoxes((prev) =>
                 prev.map((tb) => (editableIds.has(tb.id) ? { ...tb, isSubmitted: true } : tb))
             );
@@ -631,6 +674,89 @@ const App = () => {
             toast.error(
                 error.response?.data?.message || "Failed to save field values"
             );
+        }
+    };
+
+    const handleDownloadSubmittedPdf = async () => {
+        if (!pdfUrl) {
+            toast.error("PDF not found.");
+            return;
+        }
+
+        const submittedFields = textBoxes.filter((tb) => tb.isSubmitted);
+        if (submittedFields.length === 0) {
+            toast.info("No submitted fields to download yet.");
+            return;
+        }
+
+        try {
+            setIsDownloadingPdf(true);
+            const response = await fetch(pdfUrl);
+            const arrayBuffer = await response.arrayBuffer();
+            const pdfDoc = await PDFDocument.load(arrayBuffer);
+            const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            const pages = pdfDoc.getPages();
+
+            for (const tb of submittedFields) {
+                const pageIndex = Math.max((tb.page || 1) - 1, 0);
+                const page = pages[pageIndex];
+                if (!page) {
+                    continue;
+                }
+                const { height } = page.getSize();
+
+                const isImageField =
+                    tb.fieldType === "signature" ||
+                    tb.fieldType === "stamp" ||
+                    tb.fieldType === "initials";
+
+                if (isImageField) {
+                    const imageData = getFieldImageData(tb);
+                    if (imageData) {
+                        const imageBytes = convertDataUrlToBytes(imageData);
+                        const image = imageData.includes("image/png")
+                            ? await pdfDoc.embedPng(imageBytes)
+                            : await pdfDoc.embedJpg(imageBytes);
+                        const drawWidth = tb.width || 150;
+                        const drawHeight = tb.height || 50;
+                        page.drawImage(image, {
+                            x: tb.x ?? 0,
+                            y: height - (tb.y ?? 0) - drawHeight,
+                            width: drawWidth,
+                            height: drawHeight,
+                        });
+                        continue;
+                    }
+                }
+
+                const content = tb.content?.toString().trim();
+                if (content) {
+                    page.drawText(content, {
+                        x: tb.x ?? 0,
+                        y: height - (tb.y ?? 0) - 12,
+                        size: 12,
+                        font,
+                        color: rgb(0, 0, 0),
+                    });
+                }
+            }
+
+            const pdfBytes = await pdfDoc.save();
+            const blob = new Blob([pdfBytes as BlobPart], {
+                type: "application/pdf",
+            });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = fileName.replace(".pdf", "_submitted.pdf");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(link.href);
+        } catch (error) {
+            console.error("Error preparing PDF download:", error);
+            toast.error("Failed to prepare PDF download.");
+        } finally {
+            setIsDownloadingPdf(false);
         }
     };
 
@@ -685,6 +811,16 @@ const App = () => {
                                     >
                                         Submit
                                     </button>
+                                ) : hasAnyFields && isAllRecipientsSubmitted ? (
+                                    <button
+                                        className="recipient-submit-btn"
+                                        onClick={handleDownloadSubmittedPdf}
+                                        disabled={isDownloadingPdf}
+                                    >
+                                        {isDownloadingPdf
+                                            ? "Downloading..."
+                                            : "Download"}
+                                    </button>
                                 ) : hasAnyFields ? (
                                     <span className="recipient-submitted-label">
                                         Submitted
@@ -722,7 +858,8 @@ const App = () => {
                                     recipients={recipients}
                                     onUpdateTextBox={handleUpdateFieldRecipient}
                                     isSharedDocument={isSharedDocument}
-                                    activeRecipientId={isSharedDocument ? activeRecipientId : null}
+                                    activeRecipientId={activeRecipientId}
+                                    currentUserName={currentUserName}
                                 />
                             </div>
                         </>
