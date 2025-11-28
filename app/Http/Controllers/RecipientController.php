@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Mail;
 use App\Mail\ShareRecipientMail;
+use App\Mail\DocumentComplateMail;
 use Carbon\Carbon;
 use Exception;
 use DB;
