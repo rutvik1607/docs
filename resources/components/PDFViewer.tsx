@@ -50,6 +50,9 @@ interface PdfViewerProps {
     isSharedDocument?: boolean;
     activeRecipientId?: number | null;
     currentUserName?: string;
+    assignmentStep?: 'idle' | 'assigning' | 'review';
+    currentAssignmentFieldId?: string | null;
+    onAssignField?: (recipientId: number | null) => void;
 }
 
 export default function PdfViewer({
@@ -70,6 +73,9 @@ export default function PdfViewer({
     isSharedDocument = false,
     activeRecipientId = null,
     currentUserName,
+    assignmentStep = 'idle',
+    currentAssignmentFieldId = null,
+    onAssignField,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
@@ -104,6 +110,22 @@ export default function PdfViewer({
         origHeight: number;
     } | null>(null);
     const previouslySelectedRef = useRef<string | null>(null);
+
+    // Auto-scroll to active field during assignment
+    useEffect(() => {
+        if (assignmentStep === 'assigning' && currentAssignmentFieldId) {
+            const activeField = textBoxes.find(tb => tb.id === currentAssignmentFieldId);
+            if (activeField) {
+                // Find the page element
+                const pageIndex = activeField.page - 1;
+                const pageNode = containerRef.current?.querySelectorAll(".react-pdf__Page")[pageIndex] as HTMLElement | undefined;
+                
+                if (pageNode) {
+                    pageNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+    }, [assignmentStep, currentAssignmentFieldId, textBoxes]);
 
     useEffect(() => {
         setLoadError(null);
@@ -467,7 +489,13 @@ export default function PdfViewer({
                                             const hasImage = (isSignature || isStamp || isInitials) && getImageUrl(tb.id);
                                             const borderColor = tb.recipientId ? "#249d67" : "#ff6b6b";
                                             const isSubmitted = tb.isSubmitted === true;
-                                            const backgroundColor = isSubmitted ? 'transparent' : (isAssignmentMode ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566");
+                                            
+                                            // Assignment Mode Logic
+                                            const isAssigning = assignmentStep === 'assigning';
+                                            const isCurrentAssignmentField = isAssigning && tb.id === currentAssignmentFieldId;
+                                            const isDimmed = isAssigning && !isCurrentAssignmentField;
+                                            
+                                            const backgroundColor = isSubmitted ? 'transparent' : (isAssignmentMode || isAssigning ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566");
                                             const sharedEditable = isSharedDocument
                                                 ? (typeof tb.isEditableByCurrentRecipient === "boolean"
                                                     ? tb.isEditableByCurrentRecipient
@@ -475,7 +503,7 @@ export default function PdfViewer({
                                                 : true;
                                             const isLocked = isSharedDocument
                                                 ? !sharedEditable
-                                                : (tb.recipientId != null && !isAssignmentMode);
+                                                : (tb.recipientId != null && !isAssignmentMode && !isAssigning);
                                             return (
                                                 <div
                                                     key={tb.id}
@@ -483,9 +511,11 @@ export default function PdfViewer({
                                                         position: "absolute",
                                                         left,
                                                         top,
-                                                        zIndex: 10,
+                                                        zIndex: isCurrentAssignmentField ? 100 : 10,
+                                                        opacity: isDimmed ? 0.3 : 1,
+                                                        transition: 'opacity 0.3s ease',
                                                     }}
-                                                    onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted && !isLocked ? onPointerDown : undefined}
+                                                    onPointerDown={!isAssignmentMode && !isAssigning && !isSharedDocument && !isSubmitted && !isLocked ? onPointerDown : undefined}
                                                 >
                                                     <div
                                                         style={{
@@ -499,7 +529,7 @@ export default function PdfViewer({
                                                                 ? 'none'
                                                                 : (hasImage
                                                                     ? '0.5px solid #d1d5db'
-                                                                    : (tb.id === selectedTextBoxId || isAssignmentMode
+                                                                    : (tb.id === selectedTextBoxId || isAssignmentMode || isAssigning
                                                                         ? `0.5px solid ${borderColor}`
                                                                         : `1px solid ${isAssignmentMode ? borderColor : "#49806e"}`)),
                                                             borderRadius: isSubmitted ? "0" : "4px",
@@ -508,11 +538,12 @@ export default function PdfViewer({
                                                             fontWeight: "bold",
                                                             fontSize: "14px",
                                                             fontFamily: "monospace",
-                                                            cursor: isSubmitted ? "default" : (isAssignmentMode ? "default" : (isLocked ? "not-allowed" : (isSharedDocument ? "pointer" : "move"))),
+                                                            cursor: isSubmitted ? "default" : (isAssignmentMode || isAssigning ? "default" : (isLocked ? "not-allowed" : (isSharedDocument ? "pointer" : "move"))),
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
+                                                            boxShadow: isCurrentAssignmentField ? "0 0 0 4px rgba(36, 157, 103, 0.4)" : "none",
                                                         }}
-                                                        onPointerDown={!isAssignmentMode && !isSharedDocument && !isSubmitted && !isLocked ? (e) => {
+                                                        onPointerDown={!isAssignmentMode && !isAssigning && !isSharedDocument && !isSubmitted && !isLocked ? (e) => {
                                                             const isDateOrInitials = tb.fieldType === 'date' || tb.fieldType === 'initials';
                                                             setSelectedTextBoxId(tb.id);
                                                             if (isDateOrInitials) {
@@ -528,7 +559,7 @@ export default function PdfViewer({
                                                                 <div
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                        if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
                                                                             openUploadModal(tb.id, isSignature ? "signature" : "stamp");
                                                                         }
                                                                     }}
@@ -539,7 +570,7 @@ export default function PdfViewer({
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
                                                                         position: 'relative',
-                                                                        cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                        cursor: isAssignmentMode || isAssigning || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                     }}
                                                                 >
                                                                     <img
@@ -557,7 +588,7 @@ export default function PdfViewer({
                                                                 <div
                                                                     onClick={(e) => {
                                                                         e.stopPropagation();
-                                                                        if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                        if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
                                                                             openUploadModal(tb.id, isSignature ? "signature" : "stamp");
                                                                         }
                                                                     }}
@@ -567,7 +598,7 @@ export default function PdfViewer({
                                                                         display: 'flex',
                                                                         alignItems: 'center',
                                                                         justifyContent: 'center',
-                                                                        cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                        cursor: isAssignmentMode || isAssigning || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                         color: tb.content ? '#2f7d6f' : 'inherit',
                                                                     }}
                                                                 >
@@ -580,7 +611,7 @@ export default function PdfViewer({
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                    if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
                                                                         openDrawModal(tb.id, "initials");
                                                                     }
                                                                 }}
@@ -591,7 +622,7 @@ export default function PdfViewer({
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
                                                                     position: 'relative',
-                                                                    cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                    cursor: isAssignmentMode || isAssigning || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                 }}
                                                             >
                                                                 <img
@@ -609,7 +640,7 @@ export default function PdfViewer({
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
+                                                                    if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked && (isSharedDocument || previouslySelectedRef.current === tb.id)) {
                                                                         openDrawModal(tb.id, "initials");
                                                                     }
                                                                 }}
@@ -619,7 +650,7 @@ export default function PdfViewer({
                                                                     display: 'flex',
                                                                     alignItems: 'center',
                                                                     justifyContent: 'center',
-                                                                    cursor: isAssignmentMode || isSubmitted || isLocked ? 'default' : 'pointer',
+                                                                    cursor: isAssignmentMode || isAssigning || isSubmitted || isLocked ? 'default' : 'pointer',
                                                                     color: '#2f7d6f',
                                                                 }}
                                                             >
@@ -629,7 +660,7 @@ export default function PdfViewer({
                                                             <div
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
-                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked) {
+                                                                    if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked) {
                                                                         setShowDatePicker(tb.id);
                                                                         // Parse existing date if present
                                                                         const dateMatch = tb.content.match(/\d{1,2}\/\d{1,2}\/\d{4}/);
@@ -694,10 +725,10 @@ export default function PdfViewer({
                                                                     tb.fieldType === "billing" ? "Billing details" :
                                                                     "Enter value"
                                                                 }
-                                                                readOnly={isAssignmentMode || isSubmitted || isLocked}
+                                                                readOnly={isAssignmentMode || isAssigning || isSubmitted || isLocked}
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => {
-                                                                    if (!isAssignmentMode && !isSubmitted && !isLocked) {
+                                                                    if (!isAssignmentMode && !isAssigning && !isSubmitted && !isLocked) {
                                                                         updateTextBox(tb.id, e.target.value);
                                                                     }
                                                                 }}
@@ -719,7 +750,7 @@ export default function PdfViewer({
                                                                     fontSize: '14px',
                                                                     fontWeight: 'bold',
                                                                     fontFamily: 'monospace',
-                                                                    cursor: isAssignmentMode || isLocked ? 'default' : 'text',
+                                                                    cursor: isAssignmentMode || isAssigning || isLocked ? 'default' : 'text',
                                                                     padding: '0',
                                                                     direction: 'ltr',
                                                                     textAlign: 'center',
@@ -757,7 +788,61 @@ export default function PdfViewer({
                                                                 />
                                                             </div>
                                                         )}
-                                                        {isAssignmentMode && (
+                                                        {isCurrentAssignmentField && (
+                                                            <div
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    top: '100%',
+                                                                    left: '50%',
+                                                                    transform: 'translateX(-50%)',
+                                                                    background: 'white',
+                                                                    borderRadius: '8px',
+                                                                    border: '1px solid #249d67',
+                                                                    boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
+                                                                    marginTop: "12px",
+                                                                    whiteSpace: "nowrap",
+                                                                    zIndex: "1000",
+                                                                    padding: "12px",
+                                                                    display: "flex",
+                                                                    flexDirection: "column",
+                                                                    gap: "8px",
+                                                                    minWidth: "200px",
+                                                                }}
+                                                                onClick={(e) => e.stopPropagation()}
+                                                            >
+                                                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
+                                                                    Assign this field
+                                                                </div>
+                                                                <select
+                                                                    value={tb.recipientId || ""}
+                                                                    onChange={(e) => {
+                                                                        const recipientId = e.target.value ? parseInt(e.target.value) : null;
+                                                                        if (recipientId) {
+                                                                            onAssignField?.(recipientId);
+                                                                        }
+                                                                    }}
+                                                                    autoFocus
+                                                                    style={{
+                                                                        padding: "8px",
+                                                                        fontSize: "14px",
+                                                                        border: "1px solid #ccc",
+                                                                        borderRadius: "4px",
+                                                                        cursor: "pointer",
+                                                                        fontFamily: "inherit",
+                                                                        backgroundColor: "#fff",
+                                                                        width: "100%",
+                                                                    }}
+                                                                >
+                                                                    <option value="">Select Recipient</option>
+                                                                    {recipients.map((recipient) => (
+                                                                        <option key={recipient.id} value={recipient.id}>
+                                                                            {recipient.first_name} {recipient.last_name}
+                                                                        </option>
+                                                                    ))}
+                                                                </select>
+                                                            </div>
+                                                        )}
+                                                        {isAssignmentMode && !isAssigning && (
                                                             <div
                                                                 style={{
                                                                     position: 'absolute',

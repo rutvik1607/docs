@@ -63,6 +63,7 @@ interface RightSidebarProps {
     totalFields?: number;
     onCancelAssignment?: () => void;
     onCompleteAssignment?: () => void;
+    assignmentStep?: 'idle' | 'assigning' | 'review';
 }
 
 interface RightSidebarHandle {
@@ -80,6 +81,7 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
     totalFields,
     onCancelAssignment,
     onCompleteAssignment,
+    assignmentStep = 'idle',
 }, ref) => {
     const [recipients, setRecipients] = useState<Recipient[]>([]);
     const [loading, setLoading] = useState(false);
@@ -182,7 +184,9 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                 <div className="rs-assignment-mode">
                     <div className="rs-assignment-info">
                         <p className="rs-assignment-text">
-                            Assign Recipients to All Fields
+                            {assignmentStep === 'idle' 
+                                ? "Click 'Start Assignment' in the header to begin." 
+                                : (assignmentStep === 'review' ? "Review Assignments" : "Assigning Fields...")}
                         </p>
                         <p className="rs-assignment-count">
                             {assignedCount} of {totalFields} assigned
@@ -217,18 +221,21 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                     )}
 
                     <div className="rs-assignment-actions">
-                        <button
-                            className="rs-btn-cancel"
-                            onClick={onCancelAssignment}
-                        >
-                            Cancel
-                        </button>
-                        <button
-                            className="rs-btn-confirm"
-                            onClick={onCompleteAssignment}
-                        >
-                            Send
-                        </button>
+                        {assignmentStep === 'review' ? (
+                            <button
+                                className="rs-btn-confirm"
+                                onClick={onCompleteAssignment}
+                            >
+                                Send
+                            </button>
+                        ) : (
+                            <button
+                                className="rs-btn-cancel"
+                                onClick={onCancelAssignment}
+                            >
+                                {assignmentStep === 'idle' ? "Cancel" : "Cancel Assignment"}
+                            </button>
+                        )}
                     </div>
                 </div>
             ) : (

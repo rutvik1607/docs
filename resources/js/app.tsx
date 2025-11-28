@@ -72,6 +72,42 @@ const App = () => {
     const [isDownloadingPdf, setIsDownloadingPdf] = React.useState(false);
     const [isAllRecipientsSubmitted, setIsAllRecipientsSubmitted] = React.useState(false);
     const [currentUserName, setCurrentUserName] = React.useState<string>("");
+    const [assignmentStep, setAssignmentStep] = React.useState<'idle' | 'assigning' | 'review'>('idle');
+    const [currentAssignmentFieldId, setCurrentAssignmentFieldId] = React.useState<string | null>(null);
+
+    const handleStartAssignment = () => {
+        const unassignedFields = textBoxes.filter(tb => !tb.recipientId);
+        if (unassignedFields.length === 0) {
+            setAssignmentStep('review');
+            return;
+        }
+        setAssignmentStep('assigning');
+        setCurrentAssignmentFieldId(unassignedFields[0].id);
+    };
+
+    const handleAssignField = (recipientId: number | null) => {
+        if (!currentAssignmentFieldId) return;
+
+        // Update current field
+        setTextBoxes(prev => prev.map(tb => 
+            tb.id === currentAssignmentFieldId ? { ...tb, recipientId } : tb
+        ));
+
+        // Find next unassigned field
+        // We need to look at the *updated* state effectively, but since setTextBoxes is async,
+        // we can just look at the current list and exclude the one we just assigned.
+        // Actually, better to find the index of current and look for next.
+        const remainingUnassigned = textBoxes.filter(tb => 
+            !tb.recipientId && tb.id !== currentAssignmentFieldId
+        );
+
+        if (remainingUnassigned.length > 0) {
+            setCurrentAssignmentFieldId(remainingUnassigned[0].id);
+        } else {
+            setAssignmentStep('review');
+            setCurrentAssignmentFieldId(null);
+        }
+    };
 
     const textBoxesRef = React.useRef<TextBox[]>(textBoxes);
     const rightSidebarRef = useRef<any>(null);
@@ -793,43 +829,82 @@ const App = () => {
 
             <div className="main-content">
                 <div className="left-panel">
+                    {isAssignmentMode && assignmentStep === 'idle' && (
+                        <div className="recipient-submit-footer" style={{ borderTop: 'none', borderBottom: '2px solid #248567' }}>
+                            <div className="recipient-info">
+                                <span className="recipient-title">Assign Recipients</span>
+                                <span className="recipient-subtitle">Assign recipients to each field in a guided workflow.</span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    className="recipient-submit-btn"
+                                    onClick={handleStartAssignment}
+                                >
+                                    Start
+                                </button>
+                                <button
+                                    className="recipient-submit-btn"
+                                    style={{ background: 'white', color: '#333', border: '1px solid #ccc' }}
+                                    onClick={() => setIsAssignmentMode(false)}
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    )}
                     {isSharedDocument && (
                         <div className="recipient-submit-footer">
                             <div className="recipient-info">
                                 <span className="recipient-title">
                                     {bannerTitle}
                                 </span>
-                                <span className="recipient-count">
+                                <span className="recipient-subtitle">
                                     {bannerSubtitle}
                                 </span>
                             </div>
-                            <div className="recipient-actions">
-                                {hasPendingFields ? (
-                                    <button
-                                        className="recipient-submit-btn"
-                                        onClick={handleSubmitRecipientFields}
-                                    >
-                                        Submit
-                                    </button>
-                                ) : hasAnyFields && isAllRecipientsSubmitted ? (
-                                    <button
-                                        className="recipient-submit-btn"
-                                        onClick={handleDownloadSubmittedPdf}
-                                        disabled={isDownloadingPdf}
-                                    >
-                                        {isDownloadingPdf
-                                            ? "Downloading..."
-                                            : "Download"}
-                                    </button>
-                                ) : hasAnyFields ? (
-                                    <span className="recipient-submitted-label">
-                                        Submitted
-                                    </span>
-                                ) : (
-                                    <span className="recipient-submitted-label">
-                                        Awaiting fields
-                                    </span>
-                                )}
+                            {hasPendingFields && (
+                                <button
+                                    className="recipient-submit-btn"
+                                    onClick={handleSubmitRecipientFields}
+                                >
+                                    Submit Fields
+                                </button>
+                            )}
+                            {isAllRecipientsSubmitted && (
+                                <button
+                                    className="recipient-submit-btn"
+                                    onClick={handleDownloadSubmittedPdf}
+                                    disabled={isDownloadingPdf}
+                                >
+                                    {isDownloadingPdf ? "Preparing..." : "Download PDF"}
+                                </button>
+                            )}
+                        </div>
+                    )}
+                    {assignmentStep === 'review' && (
+                         <div className="recipient-submit-footer" style={{ justifyContent: 'space-between' }}>
+                            <div className="recipient-info">
+                                <span className="recipient-title">
+                                    All fields assigned
+                                </span>
+                                <span className="recipient-subtitle">
+                                    Ready to send to recipients
+                                </span>
+                            </div>
+                            <div style={{ display: 'flex', gap: '10px' }}>
+                                <button
+                                    className="rs-btn-cancel"
+                                    style={{ padding: '8px 16px', border: '1px solid #ccc', borderRadius: '4px', background: 'white', cursor: 'pointer' }}
+                                    onClick={() => setAssignmentStep('idle')}
+                                >
+                                    Back
+                                </button>
+                                <button
+                                    className="recipient-submit-btn"
+                                    onClick={handleCompleteAssignment}
+                                >
+                                    Finish
+                                </button>
                             </div>
                         </div>
                     )}
@@ -837,29 +912,25 @@ const App = () => {
                         <>
                             <div className="document-canvas">
                                 <PdfViewer
-                                    fileUrl={pdfUrl}
+                                    fileUrl={pdfUrl || ""}
                                     textBoxes={textBoxes}
-                                    updateTextBox={updateTextBox}
-                                    updateTextBoxData={updateTextBoxData}
                                     moveTextBox={moveTextBox}
                                     addTextBox={addTextBox}
                                     removeTextBox={removeTextBox}
                                     resizeTextBox={resizeTextBox}
                                     setSelectedTextBoxId={setSelectedTextBoxId}
                                     selectedTextBoxId={selectedTextBoxId}
-                                    onDocumentLoadSuccess={(pdf) =>
-                                        setNumPages(pdf.numPages)
-                                    }
-                                    isAssignmentMode={
-                                        isSharedDocument
-                                            ? false
-                                            : isAssignmentMode
-                                    }
+                                    updateTextBox={updateTextBox}
+                                    updateTextBoxData={updateTextBoxData}
+                                    isAssignmentMode={isAssignmentMode || assignmentStep === 'assigning' || assignmentStep === 'review'}
                                     recipients={recipients}
                                     onUpdateTextBox={handleUpdateFieldRecipient}
                                     isSharedDocument={isSharedDocument}
                                     activeRecipientId={activeRecipientId}
                                     currentUserName={currentUserName}
+                                    assignmentStep={assignmentStep}
+                                    currentAssignmentFieldId={currentAssignmentFieldId}
+                                    onAssignField={handleAssignField}
                                 />
                             </div>
                         </>
@@ -879,6 +950,7 @@ const App = () => {
                         totalFields={textBoxes.length}
                         onCancelAssignment={handleCancelAssignment}
                         onCompleteAssignment={handleCompleteAssignment}
+                        assignmentStep={assignmentStep}
                     />
                 )}
             </div>

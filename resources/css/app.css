@@ -723,7 +723,7 @@ textarea::placeholder {
     right: 0;
     background: white;
     border-top: 2px solid #248567;
-    padding: 16px 24px;
+    padding: 10px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -755,7 +755,7 @@ textarea::placeholder {
     background: #248567;
     color: white;
     border: none;
-    padding: 10px 24px;
+    padding: 6px 20px;
     border-radius: 4px;
     font-weight: 600;
     cursor: pointer;
