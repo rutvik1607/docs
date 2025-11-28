@@ -257,14 +257,6 @@ const SignatureStampUploadModal = ({
                                     alt="Preview"
                                     className="signature-stamp-preview"
                                 />
-                                <button
-                                    type="button"
-                                    className="signature-stamp-change-btn"
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isLoading}
-                                >
-                                    {selectedFile ? "Change File" : "Select Different File"}
-                                </button>
                             </div>
                         )
                     )}
@@ -302,35 +294,46 @@ const SignatureStampUploadModal = ({
                                 onTouchStart={signatureMode === "draw" ? startDrawing : undefined}
                                 style={{ cursor: signatureMode === "draw" ? "crosshair" : "default", touchAction: "none" }}
                             />
-                            <div className="signature-stamp-canvas-actions">
-                                <button
-                                    type="button"
-                                    className="signature-stamp-clear-btn"
-                                    onClick={clearCanvas}
-                                    disabled={isLoading || !hasDrawn}
-                                >
-                                    Clear
-                                </button>
-                            </div>
                         </div>
                     )}
                 </div>
-
+                    <>{console.log(isSignature , signatureMode)}</>
                 <footer className="signature-stamp-footer">
-                    <button
-                        className="signature-stamp-btn signature-stamp-cancel-btn"
-                        onClick={handleClose}
-                        disabled={isLoading}
-                    >
-                        Cancel
-                    </button>
-                    <button
-                        className="signature-stamp-btn signature-stamp-upload-btn"
-                        onClick={handleUpload}
-                        disabled={uploadDisabled}
-                    >
-                        {isLoading ? "Uploading..." : "Upload"}
-                    </button>
+                    <div className="signature-stamp-canvas-actions">
+                        {signatureMode === 'upload' ?(
+                            <button
+                                type="button"
+                                className="signature-stamp-change-btn"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading}
+                            >
+                                {selectedFile ? "Change File" : "Select Different File"}
+                            </button>)
+                            :(<button
+                                type="button"
+                                className="signature-stamp-clear-btn"
+                                onClick={clearCanvas}
+                                disabled={isLoading || !hasDrawn}
+                            >
+                                Clear
+                            </button>)}
+                    </div>
+                    <div style={{ display: "flex", gap: "12px" }}>
+                        <button
+                            className="signature-stamp-btn signature-stamp-cancel-btn"
+                            onClick={handleClose}
+                            disabled={isLoading}
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            className="signature-stamp-btn signature-stamp-upload-btn"
+                            onClick={handleUpload}
+                            disabled={uploadDisabled}
+                        >
+                            {isLoading ? "Uploading..." : "Upload"}
+                        </button>
+                    </div>
                 </footer>
 
                 <style>{`
@@ -622,7 +625,8 @@ const SignatureStampUploadModal = ({
 
                     .signature-stamp-footer {
                         display: flex;
-                        justify-content: flex-end;
+                        justify-content: space-between;
+                        align-items: center;
                         gap: 12px;
                         margin-top: 8px;
                     }
