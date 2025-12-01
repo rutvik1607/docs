@@ -784,6 +784,68 @@ const App = () => {
                 }
             }
 
+            // Add footer to every page
+            const totalPages = pages.length;
+            const footerHeight = 14;
+            
+            // Generate reference number: XXXX-XXXX-XXXX-XXXX (4 blocks of 5 alphanumeric chars)
+            const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            const generateBlock = () => {
+                let block = '';
+                for (let i = 0; i < 5; i++) {
+                    block += chars.charAt(Math.floor(Math.random() * chars.length));
+                }
+                return block;
+            };
+            const referenceNumber = `${generateBlock()}-${generateBlock()}-${generateBlock()}-${generateBlock()}`;
+            
+            pages.forEach((page, index) => {
+                const { width, height } = page.getSize();
+                
+                // Resize page to accommodate footer
+                page.setSize(width, height + footerHeight);
+
+                const fontSize = 8;
+                const textY = (footerHeight - fontSize) / 2 + 2; // Vertically center text
+                
+                // Draw Reference Number at bottom left
+                const refText = `Document Ref: ${referenceNumber}`;
+                // Draw footer background
+                page.drawRectangle({
+                    x: -(width - 15 - font.widthOfTextAtSize(refText, fontSize)),
+                    y: 0,
+                    width: width,
+                    height: footerHeight,
+                    color: rgb(0.827, 0.827, 0.827), // #d3d3d3
+                });
+                page.drawText(refText, {
+                    x: 10,
+                    y: textY,
+                    size: fontSize,
+                    font,
+                    color: rgb(0, 0, 0),
+                });
+
+                // Draw Page Number at bottom right
+                const pageText = `Page ${index + 1} of ${totalPages}`;
+                const pageTextWidth = font.widthOfTextAtSize(pageText, fontSize);
+                page.drawRectangle({
+                    x: width - 25 - pageTextWidth,
+                    y: 0,
+                    width: width,
+                    height: footerHeight,
+                    color: rgb(0.827, 0.827, 0.827), // #d3d3d3
+                });
+                page.drawText(pageText, {
+                    x: width - 20 - pageTextWidth,
+                    y: textY,
+                    size: fontSize,
+                    font,
+                    color: rgb(0, 0, 0),
+                });
+                
+            });
+
             const pdfBytes = await pdfDoc.save();
             const blob = new Blob([pdfBytes as BlobPart], {
                 type: "application/pdf",
