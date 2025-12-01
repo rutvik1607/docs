@@ -1,0 +1,96 @@
+.dc-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1200;
+    /* High z-index to be above other modals */
+}
+
+.dc-confirmation-modal {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+    width: 90%;
+    max-width: 400px;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+}
+
+.dc-modal-header {
+    border-bottom: 1px solid #e8eaed;
+    padding: 16px 24px;
+}
+
+.dc-modal-title {
+    font-size: 18px;
+    font-weight: 500;
+    color: #202124;
+    margin: 0;
+}
+
+.dc-modal-body {
+    padding: 16px 24px;
+}
+
+.dc-modal-message {
+    font-size: 14px;
+    color: #202124;
+    margin: 0 0 8px 0;
+    line-height: 1.5;
+}
+
+.dc-modal-warning {
+    color: #d32f2f;
+    font-size: 13px;
+    margin-top: 12px !important;
+}
+
+.dc-modal-footer {
+    border-top: 1px solid #e8eaed;
+    padding: 12px 24px;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.dc-modal-btn {
+    padding: 8px 16px;
+    border-radius: 4px;
+    border: none;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+        background 0.15s ease,
+        color 0.15s ease;
+}
+
+.dc-modal-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.dc-modal-btn-cancel {
+    background: #f1f3f4;
+    color: #202124;
+    border: 1px solid #dadce0;
+}
+
+.dc-modal-btn-cancel:hover:not(:disabled) {
+    background: #e8eaed;
+}
+
+.dc-modal-btn-delete {
+    background: #d32f2f;
+    color: white;
+}
+
+.dc-modal-btn-delete:hover:not(:disabled) {
+    background: #b71c1c;
+}

@@ -21,3 +21,6 @@ Route::post('delete-recipient', [RecipientController::class, 'deleteRecipient'])
 Route::post('save-field-assignments', [RecipientController::class, 'saveFieldAssignments']);
 Route::post('save-recipient-field-values', [RecipientController::class, 'saveRecipientFieldValues']);
 Route::post('get-template-data', [RecipientController::class, 'getTemplateData']);
+
+use App\Http\Controllers\EmailTemplateController;
+Route::apiResource('email-templates', EmailTemplateController::class);

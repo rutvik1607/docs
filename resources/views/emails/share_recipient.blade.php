@@ -119,7 +119,11 @@
     <div class="message-box">
       <div class="avatar" aria-label="Profile Icon">&#128100;</div>
       <div class="message-text">
-        <b>{{ $sender->name ?? 'Someone' }}</b> sent you <b>{{ $documentName ?? 'Document' }}.</b>
+        @if(!empty($customBody))
+            {!! nl2br(e($customBody)) !!}
+        @else
+            <b>{{ $sender->name ?? 'Someone' }}</b> sent you <b>{{ $documentName ?? 'Document' }}.</b>
+        @endif
       </div>
     </div>
     <div class="buttons">

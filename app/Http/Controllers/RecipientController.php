@@ -1025,7 +1025,9 @@ class RecipientController extends Controller
                 ];
 
                 try {
-                    Mail::to($rec->email)->send(new ShareRecipientMail($sender, $recipientData, $secureLink, $documentName));
+                    $customSubject = $request->subject ?? null;
+                    $customBody = $request->body ?? null;
+                    Mail::to($rec->email)->send(new ShareRecipientMail($sender, $recipientData, $secureLink, $documentName, $customSubject, $customBody));
                     $emailsSent++;
                 } catch (Exception $e) {
                     \Log::error('Failed to send email to ' . $rec->email . ': ' . $e->getMessage());

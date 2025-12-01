@@ -391,12 +391,12 @@ const AddRecipientModal = ({ showAddRecipientModal, onClose, onSuccess, template
                     }
 
                     .add-recipient-add-btn {
-                        background: #a2b5a1;
+                        background: #248567;
                         color: white;
                     }
 
                     .add-recipient-add-btn:hover:not(:disabled) {
-                        background: #8a9a8a;
+                        background: #248567;
                     }
 
                     .add-recipient-add-btn:disabled {

@@ -428,11 +428,11 @@ const CreateRecipientModal = ({ onClose, onCreate, templateId = 1 }:{onClose:() 
         }
 
         .create-btn {
-          background: #a2b5a1;
+          background: #248567;
           color: white;
         }
         .create-btn:hover {
-          background: #8a9a8a;
+          background: #248567;
         }
 
         @media (max-width: 480px) {

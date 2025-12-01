@@ -545,6 +545,7 @@ export default function PdfViewer({
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
                                                             boxShadow: isCurrentAssignmentField ? "0 0 0 4px rgba(36, 157, 103, 0.4)" : "none",
+                                                            position: 'relative'
                                                         }}
                                                         onPointerDown={!isAssignmentMode && !isAssigning && !isSharedDocument && !isSubmitted && !isLocked ? (e) => {
                                                             const isDateOrInitials = tb.fieldType === 'date' || tb.fieldType === 'initials';
@@ -555,7 +556,53 @@ export default function PdfViewer({
                                                             // Allow dragging from border/padding
                                                             onPointerDown(e);
                                                         } : undefined}
+                                                        onMouseEnter={(e) => {
+                                                            // No-op: using CSS-only tooltip rendered below
+                                                        }}
                                                     >
+                                                        {tb.recipientId && (tb.recipientName || tb.recipientEmail) && (
+                                                            <div
+                                                                style={{
+                                                                    position: 'absolute',
+                                                                    top: '-34px',
+                                                                    left: '50%',
+                                                                    transform: 'translateX(-50%)',
+                                                                    backgroundColor: '#111827',
+                                                                    color: '#fff',
+                                                                    padding: '6px 8px',
+                                                                    borderRadius: '6px',
+                                                                    fontSize: '12px',
+                                                                    lineHeight: 1,
+                                                                    whiteSpace: 'nowrap',
+                                                                    boxShadow: '0 4px 10px rgba(0,0,0,0.2)',
+                                                                    pointerEvents: 'none',
+                                                                    opacity: 0,
+                                                                    transition: 'opacity 0.15s ease',
+                                                                }}
+                                                                className="assigned-tooltip"
+                                                            >
+                                                                Assigned to: {tb.recipientName ? tb.recipientName : tb.recipientEmail}
+                                                                <span
+                                                                    style={{
+                                                                        position: 'absolute',
+                                                                        bottom: '-6px',
+                                                                        left: '50%',
+                                                                        transform: 'translateX(-50%)',
+                                                                        width: 0,
+                                                                        height: 0,
+                                                                        borderLeft: '6px solid transparent',
+                                                                        borderRight: '6px solid transparent',
+                                                                        borderTop: '6px solid #111827',
+                                                                    }}
+                                                                />
+                                                            </div>
+                                                        )}
+                                                        <style>
+                                                            {`
+                                                                .assigned-tooltip { opacity: 0; }
+                                                                .assigned-tooltip:hover { opacity: 1; }
+                                                            `}
+                                                        </style>
                                                         {/* Editable content area behaving like a textarea while preserving styling */}
                                                         {(isSignature || isStamp) ? (
                                                             getImageUrl(tb.id) ? (
@@ -837,50 +884,6 @@ export default function PdfViewer({
                                                                     }}
                                                                 >
                                                                     <option value="">Select Recipient</option>
-                                                                    {recipients.map((recipient) => (
-                                                                        <option key={recipient.id} value={recipient.id}>
-                                                                            {recipient.first_name} {recipient.last_name}
-                                                                        </option>
-                                                                    ))}
-                                                                </select>
-                                                            </div>
-                                                        )}
-                                                        {isAssignmentMode && !isAssigning && (
-                                                            <div
-                                                                style={{
-                                                                    position: 'absolute',
-                                                                    top: '100%',
-                                                                    left: '50%',
-                                                                    transform: 'translateX(-50%)',
-                                                                    background: 'white',
-                                                                    borderRadius: '4px',
-                                                                    border: '1px solid #ccc',
-                                                                    boxShadow: "0px 2px 8px rgba(0,0,0,0.15)",
-                                                                    marginTop: "6px",
-                                                                    whiteSpace: "nowrap",
-                                                                    zIndex: "999",
-                                                                    marginLeft: "8px",
-                                                                    display: "inline-block",
-                                                                }}
-                                                                onClick={(e) => e.stopPropagation()}
-                                                            >
-                                                                <select
-                                                                    value={tb.recipientId || ""}
-                                                                    onChange={(e) => {
-                                                                        const recipientId = e.target.value ? parseInt(e.target.value) : null;
-                                                                        onUpdateTextBox?.(tb.id, recipientId);
-                                                                    }}
-                                                                    style={{
-                                                                        padding: "6px 8px",
-                                                                        fontSize: "12px",
-                                                                        border: "none",
-                                                                        borderRadius: "2px",
-                                                                        cursor: "pointer",
-                                                                        fontFamily: "inherit",
-                                                                        backgroundColor: "#fff",
-                                                                    }}
-                                                                >
-                                                                    <option value="">Assign Reciepent</option>
                                                                     {recipients.map((recipient) => (
                                                                         <option key={recipient.id} value={recipient.id}>
                                                                             {recipient.first_name} {recipient.last_name}

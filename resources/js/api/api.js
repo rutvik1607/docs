@@ -115,13 +115,22 @@ export const saveFieldAssignments = async (templateId, userId, fields) => {
     }
 };
 
-// Send share email to recipients
-export const sendShareEmail = async (recipientIds, templateId, userId) => {
+/**
+ * Send share email to recipients
+ * @param {number[]} recipientIds 
+ * @param {number} templateId 
+ * @param {number} userId 
+ * @param {string|null} subject 
+ * @param {string|null} body 
+ */
+export const sendShareEmail = async (recipientIds, templateId, userId, subject = null, body = null) => {
     try {
         const response = await axios.post(`${API_BASE_URL}/send-share-email`, {
             recipient_ids: recipientIds,
             template_id: templateId,
-            user_id: userId
+            user_id: userId,
+            subject: subject,
+            body: body
         });
         return response.data;
     } catch (error) {
@@ -154,6 +163,49 @@ export const getTemplateData = async (templateId, userId) => {
         return response.data;
     } catch (error) {
         console.error("Failed to fetch template data:", error);
+        throw error;
+    }
+};
+// Get email templates
+export const getEmailTemplates = async () => {
+    try {
+        const response = await axios.get(`${API_BASE_URL}/email-templates`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch email templates:", error);
+        throw error;
+    }
+};
+
+// Create email template
+export const createEmailTemplate = async (templateData) => {
+    try {
+        const response = await axios.post(`${API_BASE_URL}/email-templates`, templateData);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to create email template:", error);
+        throw error;
+    }
+};
+
+// Update email template
+export const updateEmailTemplate = async (id, templateData) => {
+    try {
+        const response = await axios.put(`${API_BASE_URL}/email-templates/${id}`, templateData);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to update email template:", error);
+        throw error;
+    }
+};
+
+// Delete email template
+export const deleteEmailTemplate = async (id) => {
+    try {
+        const response = await axios.delete(`${API_BASE_URL}/email-templates/${id}`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to delete email template:", error);
         throw error;
     }
 };

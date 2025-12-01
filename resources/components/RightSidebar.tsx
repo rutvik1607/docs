@@ -4,6 +4,7 @@
 import { DragEvent, JSX, useEffect, useState, useImperativeHandle, forwardRef } from "react";
 import { getRecipientsByTemplate, deleteRecipient } from "../js/api/api";
 import AddRecipientModal from "./AddRecipientModal";
+import DeleteConfirmationModal from "./DeleteConfirmationModal";
 import { BillingIcon, DateIcon, InitialsIcon, RecipeentIcon, SendIcon, SignatureIcon, StampPlaceholderIcon, TextIcon, TrashIcon } from "./Icons";
 
 // Button model to standardize icon or svg
@@ -219,24 +220,6 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                             </div>
                         </div>
                     )}
-
-                    <div className="rs-assignment-actions">
-                        {assignmentStep === 'review' ? (
-                            <button
-                                className="rs-btn-confirm"
-                                onClick={onCompleteAssignment}
-                            >
-                                Send
-                            </button>
-                        ) : (
-                            <button
-                                className="rs-btn-cancel"
-                                onClick={onCancelAssignment}
-                            >
-                                {assignmentStep === 'idle' ? "Cancel" : "Cancel Assignment"}
-                            </button>
-                        )}
-                    </div>
                 </div>
             ) : (
                 <>
@@ -347,43 +330,20 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
             )}
 
             {/* Delete Confirmation Modal */}
-            {deleteConfirmation.isOpen && (
-                <div className="rs-confirm-modal-overlay" onClick={handleDeleteCancel}>
-                    <div
-                        className="rs-confirm-confirmation-modal"
-                        onClick={(e) => e.stopPropagation()}
-                    >
-                        <div className="rs-confirm-modal-header">
-                            <h3 className="rs-confirm-modal-title">Delete Recipient</h3>
-                        </div>
-                        <div className="rs-confirm-modal-body">
-                            <p>
-                                Are you sure you want to delete{" "}
-                                <strong>{deleteConfirmation.recipientName}</strong>?
-                            </p>
-                            <p className="rs-confirm-modal-warning">
-                                This action cannot be undone.
-                            </p>
-                        </div>
-                        <div className="rs-confirm-modal-footer">
-                            <button
-                                className="rs-confirm-modal-btn rs-confirm-modal-btn-cancel"
-                                onClick={handleDeleteCancel}
-                                disabled={isDeleting}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                className="rs-confirm-modal-btn rs-confirm-modal-btn-delete"
-                                onClick={handleDeleteConfirm}
-                                disabled={isDeleting}
-                            >
-                                {isDeleting ? "Deleting..." : "Delete"}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            <DeleteConfirmationModal
+                isOpen={deleteConfirmation.isOpen}
+                onClose={handleDeleteCancel}
+                onConfirm={handleDeleteConfirm}
+                title="Delete Recipient"
+                message={
+                    <>
+                        Are you sure you want to delete{" "}
+                        <strong>{deleteConfirmation.recipientName}</strong>?
+                    </>
+                }
+                warning="This action cannot be undone."
+                isDeleting={isDeleting}
+            />
         </aside>
     );
 });

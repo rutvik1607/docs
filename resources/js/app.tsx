@@ -19,6 +19,7 @@ import "react-toastify/dist/ReactToastify.css";
 import axios from "axios";
 import { useParams, useLocation, BrowserRouter } from "react-router-dom";
 import RecipientModal from "../components/Reciepents";
+import SendDocumentModal from "../components/SendDocumentModal";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -74,6 +75,7 @@ const App = () => {
     const [currentUserName, setCurrentUserName] = React.useState<string>("");
     const [assignmentStep, setAssignmentStep] = React.useState<'idle' | 'assigning' | 'review'>('idle');
     const [currentAssignmentFieldId, setCurrentAssignmentFieldId] = React.useState<string | null>(null);
+    const [showSendDocumentModal, setShowSendDocumentModal] = useState(false);
 
     const handleStartAssignment = () => {
         const unassignedFields = textBoxes.filter(tb => !tb.recipientId);
@@ -558,6 +560,11 @@ const App = () => {
             return;
         }
 
+        setShowSendDocumentModal(true);
+    };
+
+    const handleFinalSend = async (subject: string, body: string) => {
+        setShowSendDocumentModal(false);
         setIsAssignmentMode(false);
 
         if (!pdfUrl) {
@@ -616,7 +623,7 @@ const App = () => {
 
             const recipientIds = recipients.map((r) => r.id);
             if (recipientIds.length > 0) {
-                await sendShareEmail(recipientIds, 1, 1);
+                await sendShareEmail(recipientIds, 1, 1, subject, body);
                 toast.success(
                     `PDF saved and emails sent to recipients successfully.`
                 );
@@ -957,9 +964,21 @@ const App = () => {
             <style>{`
                 
             `}</style>
+            {/* Send Document Modal */}
+            {showSendDocumentModal && (
+                <SendDocumentModal
+                    onClose={() => setShowSendDocumentModal(false)}
+                    onSend={handleFinalSend}
+                    recipients={recipients}
+                    senderName={currentUserName || "Me"}
+                    fileName={fileName}
+                />
+            )}
         </div>
     );
 };
+
+export default App;
 
 const rootElement = document.getElementById("app");
 if (rootElement) {

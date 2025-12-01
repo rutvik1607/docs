@@ -17,19 +17,23 @@ class ShareRecipientMail extends Mailable
     public $recipient;
     public $link;
     public $documentName;
+    public $customSubject;
+    public $customBody;
 
-    public function __construct($sender, $recipient, $link, $documentName = 'Document')
+    public function __construct($sender, $recipient, $link, $documentName = 'Document', $customSubject = null, $customBody = null)
     {
         $this->sender = $sender;
         $this->recipient = $recipient;
         $this->link      = $link;
         $this->documentName = $documentName;
+        $this->customSubject = $customSubject;
+        $this->customBody = $customBody;
     }
 
     public function build()
     {
         $senderName = $this->sender->name ?? 'Someone';
-        $subject = $senderName . ' sent you ' . $this->documentName . ' via DocuCrafter';
+        $subject = $this->customSubject ?? ($senderName . ' sent you ' . $this->documentName . ' via DocuCrafter');
         
         return $this->subject($subject)
             ->view('emails.share_recipient')
@@ -38,6 +42,7 @@ class ShareRecipientMail extends Mailable
                 'name' => $this->recipient->first_name,
                 'link' => $this->link,
                 'documentName' => $this->documentName,
+                'customBody' => $this->customBody,
             ]);
     }
 }
