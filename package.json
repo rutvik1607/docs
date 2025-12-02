@@ -25,6 +25,7 @@
         "@types/react-datepicker": "^7.0.0",
         "@vitejs/plugin-react": "^5.1.0",
         "fabric": "^6.7.1",
+        "html2canvas": "^1.4.1",
         "laravel-echo": "^2.2.6",
         "pandadoc-editor": "^0.0.0-b.10",
         "pdf-lib": "^1.17.1",

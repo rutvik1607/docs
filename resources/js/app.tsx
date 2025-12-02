@@ -20,6 +20,7 @@ import axios from "axios";
 import { useParams, useLocation, BrowserRouter } from "react-router-dom";
 import RecipientModal from "../components/Reciepents";
 import SendDocumentModal from "../components/SendDocumentModal";
+import { attachCertificateToDocument, formatCertificateDate, CertificateData } from "../utils/CertificateGenerator";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -846,7 +847,52 @@ const App = () => {
                 
             });
 
-            const pdfBytes = await pdfDoc.save();
+            let pdfBytes = await pdfDoc.save();
+
+            // Attach certificate page if all recipients have submitted
+            if (isAllRecipientsSubmitted) {
+                try {
+                    // Collect recipient data for certificate
+                    const recipientMap = new Map<number, any>();
+                    recipients.forEach(r => {
+                        recipientMap.set(r.id, {
+                            name: `${r.first_name} ${r.last_name}`,
+                            email: r.email,
+                            signedAt: formatCertificateDate(new Date()),
+                            signature: undefined
+                        });
+                    });
+
+                    // Update with actual signature data from submitted fields
+                    submittedFields.forEach(field => {
+                        if (field.recipientId && recipientMap.has(field.recipientId)) {
+                            const recipient = recipientMap.get(field.recipientId);
+                            if (field.fieldType === 'signature' && !recipient.signature) {
+                                const imageData = getFieldImageData(field);
+                                if (imageData) {
+                                    recipient.signature = imageData;
+                                }
+                            }
+                        }
+                    });
+
+                    const certificateData: CertificateData = {
+                        documentTitle: fileName.replace('.pdf', ''),
+                        referenceNumber: referenceNumber,
+                        completedAt: formatCertificateDate(new Date()),
+                        recipients: Array.from(recipientMap.values())
+                    };
+
+                    // Attach certificate to PDF
+                    pdfBytes = await attachCertificateToDocument(pdfBytes, certificateData);
+                    console.log('Certificate page attached successfully');
+                } catch (certError) {
+                    console.error('Error attaching certificate:', certError);
+                    // Continue with download even if certificate fails
+                    toast.warning('PDF downloaded without certificate page');
+                }
+            }
+
             const blob = new Blob([pdfBytes as BlobPart], {
                 type: "application/pdf",
             });
