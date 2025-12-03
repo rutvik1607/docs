@@ -24,6 +24,7 @@ import DocumentSendModal from "../components/DocumentSendModel";
 import AllParticipantsCompleteDocModal from "../components/AllParticipantsCompleteDocModal";
 import DoneYourPartModal from "../components/DoneYourPartModal";
 import { attachCertificateToDocument, formatCertificateDate, CertificateData } from "../utils/CertificateGenerator";
+import { fetchIpGeolocation } from "../utils/IpGeolocation";
 
 // Initialize PDF.js worker
 if (typeof window !== "undefined") {
@@ -47,6 +48,8 @@ const App = () => {
         recipientName?: string;
         recipientEmail?: string;
         isEditableByCurrentRecipient?: boolean;
+        ipAddress?: string;
+        location?: string;
     }
 
     interface Recipient {
@@ -90,6 +93,7 @@ const App = () => {
             setAssignmentStep('review');
             return;
         }
+        console.log()
         setAssignmentStep('assigning');
         setCurrentAssignmentFieldId(unassignedFields[0].id);
     };
@@ -341,6 +345,8 @@ const App = () => {
                                     field.isSubmitted === true ||
                                     (!isEditableByRecipient && (hasContent || hasImageData)),
                                 isEditableByCurrentRecipient: isEditableByRecipient,
+                                ipAddress: field.ipAddress,
+                                location: field.location,
                             };
 
                             // Also store in localStorage as fallback for the PDFViewer to access
@@ -430,6 +436,8 @@ const App = () => {
                                             recipientId: recipient.recipient_id,
                                             imageData: field.imageData, // Include imageData from database
                                             isSubmitted: field.isSubmitted || false, // Include submission status from database
+                                            ipAddress: field.ipAddress,
+                                            location: field.location,
                                         };
 
                                         // If field has imageData, store it in localStorage as fallback
@@ -509,7 +517,7 @@ const App = () => {
 
     // Save textBoxes to localStorage on page unload or route change
     React.useEffect(() => {
-        const saveToStorage = () => {
+        const saveToStorage = async() => {
             if (pdfUrl) {
                 const storageKey = `pdf-textBoxes-${pdfUrl}`;
                 localStorage.setItem(
@@ -518,6 +526,8 @@ const App = () => {
                 );
             }
         };
+        const geolocation = fetchIpGeolocation();
+                console.log(geolocation,"geolocation");
 
         // Save on route change
         saveToStorage();
@@ -656,14 +666,14 @@ const App = () => {
             return;
         }
 
-        if(handleStartAssignment && assignmentStep === 'idle') {
+        if(handleStartAssignment && (assignmentStep === 'idle' || assignmentStep === 'assigning')) {
             handleStartAssignment();
+            setIsAssignmentMode(true);
             return;
         }else if(assignmentStep === 'review') {
             handleCompleteAssignment()
             return;
         }
-        setIsAssignmentMode(true);
     };
 
     const handleCompleteAssignment = async () => {
@@ -788,7 +798,31 @@ const App = () => {
             return;
         }
 
+        // Validate that all fields are filled
+        const unfilledFields = editableRecipientFields.filter(tb => !isFieldFilled(tb));
+        if (unfilledFields.length > 0) {
+            toast.error(`Please fill all ${unfilledFields.length} assigned field(s) before finishing.`);
+            
+            // Optional: Jump to the first unfilled field
+            setIsFillingMode(true);
+            setCurrentFillingFieldId(unfilledFields[0].id);
+            setShowFinishButton(false);
+            return;
+        }
+
         try {
+            // Fetch IP Geolocation
+            let ipData = { ipAddress: '', location: '' };
+            try {
+                const geolocation = await fetchIpGeolocation();
+                ipData = {
+                    ipAddress: geolocation.ipAddress,
+                    location: geolocation.location
+                };
+            } catch (error) {
+                console.error("Failed to fetch IP geolocation:", error);
+            }
+
             const fieldsData = editableRecipientFields.map((tb) => {
                 const fieldData: any = {
                     id: tb.id,
@@ -800,6 +834,8 @@ const App = () => {
                     width: tb.width,
                     height: tb.height,
                     isSubmitted: true,
+                    ipAddress: ipData.ipAddress,
+                    location: ipData.location,
                 };
 
                 if (tb.fieldType === "signature" || tb.fieldType === "stamp" || tb.fieldType === "initials") {
@@ -822,7 +858,12 @@ const App = () => {
             
             const editableIds = new Set(editableRecipientFields.map((tb) => tb.id));
             setTextBoxes((prev) =>
-                prev.map((tb) => (editableIds.has(tb.id) ? { ...tb, isSubmitted: true } : tb))
+                prev.map((tb) => (editableIds.has(tb.id) ? { 
+                    ...tb, 
+                    isSubmitted: true,
+                    ipAddress: ipData.ipAddress,
+                    location: ipData.location
+                } : tb))
             );
             
             setIsFillingMode(false);
@@ -982,10 +1023,20 @@ const App = () => {
                         });
                     });
 
-                    // Update with actual signature data from submitted fields
+                    // Update with actual signature data and IP/Location from submitted fields
                     submittedFields.forEach(field => {
                         if (field.recipientId && recipientMap.has(field.recipientId)) {
                             const recipient = recipientMap.get(field.recipientId);
+                            console.log(recipient,"recipient")
+                            
+                            // Update IP and Location if available (take from the first field that has it)
+                            if (field.ipAddress && !recipient.ipAddress) {
+                                recipient.ipAddress = field.ipAddress;
+                            }
+                            if (field.location && !recipient.location) {
+                                recipient.location = field.location;
+                            }
+
                             if (field.fieldType === 'signature' && !recipient.signature) {
                                 const imageData = getFieldImageData(field);
                                 if (imageData) {
@@ -1227,8 +1278,8 @@ const App = () => {
                         templateId={1}
                         onRecipientUpdate={handleUpdateRecipients}
                         isAssignmentMode={isAssignmentMode}
-                        assignedCount={textBoxes.filter((tb) => tb.recipientId).length}
-                        totalFields={textBoxes.length}
+                        assignedCount={textBoxes.filter((tb) => tb.recipientId && !tb.isSubmitted).length}
+                        totalFields={textBoxes.filter((tb) => !tb.isSubmitted).length}
                         onCancelAssignment={handleCancelAssignment}
                         onCompleteAssignment={handleCompleteAssignment}
                         assignmentStep={assignmentStep}

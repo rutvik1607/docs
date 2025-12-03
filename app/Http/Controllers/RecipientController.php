@@ -621,6 +621,14 @@ class RecipientController extends Controller
                     if (isset($matchingField['isSubmitted'])) {
                         $existingField['isSubmitted'] = $matchingField['isSubmitted'];
                     }
+
+                    // Update IP Address and Location
+                    if (isset($matchingField['ipAddress'])) {
+                        $existingField['ipAddress'] = $matchingField['ipAddress'];
+                    }
+                    if (isset($matchingField['location'])) {
+                        $existingField['location'] = $matchingField['location'];
+                    }
                 }
                 $updatedFields[] = $existingField;
             }

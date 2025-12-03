@@ -16,6 +16,8 @@ export interface CertificateRecipient {
     email: string;
     signedAt: string;
     signature?: string;
+    ipAddress?: string;
+    location?: string;
 }
 
 /**
@@ -75,6 +77,7 @@ function populateCertificateData(templateHtml: string, data: CertificateData): s
         doc.body.appendChild(contentContainer);
     }
 
+    console.log(data, "reciepentdata")
 
     // Create content HTML with detailed certificate layout
     const contentHtml = `
@@ -135,9 +138,9 @@ function populateCertificateData(templateHtml: string, data: CertificateData): s
                         </div>
                         <div style="margin-top: 10px;">
                             <div style="font-size: 9px; color: #999; margin-bottom: 2px;">IP ADDRESS</div>
-                            <div style="font-size: 10px; margin-bottom: 8px;">---.---.---.---</div>
+                            <div style="font-size: 10px; margin-bottom: 8px;">${recipient.ipAddress || 'N/A'}</div>
                             <div style="font-size: 9px; color: #999; margin-bottom: 2px;">LOCATION</div>
-                            <div style="font-size: 10px;">---</div>
+                            <div style="font-size: 10px;">${recipient.location || 'N/A'}</div>
                         </div>
                     </div>
                 </div>
