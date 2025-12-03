@@ -22,6 +22,7 @@ import RecipientModal from "../components/Reciepents";
 import SendDocumentModal from "../components/SendDocumentModal";
 import DocumentSendModal from "../components/DocumentSendModel";
 import AllParticipantsCompleteDocModal from "../components/AllParticipantsCompleteDocModal";
+import DoneYourPartModal from "../components/DoneYourPartModal";
 import { attachCertificateToDocument, formatCertificateDate, CertificateData } from "../utils/CertificateGenerator";
 
 // Initialize PDF.js worker
@@ -81,6 +82,7 @@ const App = () => {
     const [showSendDocumentModal, setShowSendDocumentModal] = useState(false);
     const [showDocumentSentModal, setShowDocumentSentModal] = useState(false);
     const [showAllParticipantsCompleteModal, setShowAllParticipantsCompleteModal] = useState(false);
+    const [showDoneYourPartModal, setShowDoneYourPartModal] = useState(false);
 
     const handleStartAssignment = () => {
         const unassignedFields = textBoxes.filter(tb => !tb.recipientId);
@@ -827,6 +829,8 @@ const App = () => {
             setShowFinishButton(false);
             setCurrentFillingFieldId(null);
 
+            setShowDoneYourPartModal(true);
+
             toast.success("Field values saved successfully!");
         } catch (error: any) {
             console.error("Error saving field values:", error);
@@ -1249,9 +1253,13 @@ const App = () => {
                     onClose={() => setShowDocumentSentModal(false)}
                 />
             )}
-            <AllParticipantsCompleteDocModal
+            {/* <AllParticipantsCompleteDocModal
                 isOpen={showAllParticipantsCompleteModal}
                 onClose={() => setShowAllParticipantsCompleteModal(false)}
+            /> */}
+            <DoneYourPartModal
+                isOpen={showDoneYourPartModal}
+                onClose={() => setShowDoneYourPartModal(false)}
             />
         </div>
     );

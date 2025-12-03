@@ -6,7 +6,7 @@ import "react-datepicker/dist/react-datepicker.css";
 import { BillingIcon, DateIcon, SignatureIcon, StampPlaceholderIcon } from "./Icons";
 import SignatureStampUploadModal from "./SignatureStampUploadModal";
 import DocumentSendModel from "./DocumentSendModel";
-import DoneYourPartModel from "./DoneYourPartModel";
+
 
 import SignatureDrawModal from "./SignatureDrawModal";
 
