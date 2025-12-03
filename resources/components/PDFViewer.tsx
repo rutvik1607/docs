@@ -7,7 +7,7 @@ import { BillingIcon, DateIcon, SignatureIcon, StampPlaceholderIcon } from "./Ic
 import SignatureStampUploadModal from "./SignatureStampUploadModal";
 import DocumentSendModel from "./DocumentSendModel";
 import DoneYourPartModel from "./DoneYourPartModel";
-import AllParticipantsCompleteDocModal from "./AllParticipantsCompleteDocModal";
+
 import SignatureDrawModal from "./SignatureDrawModal";
 
 interface TextBox {
@@ -56,6 +56,8 @@ interface PdfViewerProps {
     assignmentStep?: 'idle' | 'assigning' | 'review';
     currentAssignmentFieldId?: string | null;
     onAssignField?: (recipientId: number | null) => void;
+    currentFillingFieldId?: string | null;
+    isFillingMode?: boolean;
 }
 
 export default function PdfViewer({
@@ -79,6 +81,8 @@ export default function PdfViewer({
     assignmentStep = 'idle',
     currentAssignmentFieldId = null,
     onAssignField,
+    currentFillingFieldId = null,
+    isFillingMode = false,
 }: PdfViewerProps) {
     const [numPages, setNumPages] = useState<number>(0);
     const [loadError, setLoadError] = useState<Error | null>(null);
@@ -115,9 +119,25 @@ export default function PdfViewer({
     const previouslySelectedRef = useRef<string | null>(null);
 
     // Auto-scroll to active field during assignment
+    // useEffect(() => {
+    //     if (assignmentStep === 'assigning' && currentAssignmentFieldId) {
+    //         const activeField = textBoxes.find(tb => tb.id === currentAssignmentFieldId);
+    //         if (activeField) {
+    //             // Find the page element
+    //             const pageIndex = activeField.page - 1;
+    //             const pageNode = containerRef.current?.querySelectorAll(".react-pdf__Page")[pageIndex] as HTMLElement | undefined;
+                
+    //             if (pageNode) {
+    //                 pageNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    //             }
+    //         }
+    //     }
+    // }, [assignmentStep, currentAssignmentFieldId, textBoxes]);
+
+    // Auto-scroll to active field during filling mode
     useEffect(() => {
-        if (assignmentStep === 'assigning' && currentAssignmentFieldId) {
-            const activeField = textBoxes.find(tb => tb.id === currentAssignmentFieldId);
+        if (isFillingMode && currentFillingFieldId) {
+            const activeField = textBoxes.find(tb => tb.id === currentFillingFieldId);
             if (activeField) {
                 // Find the page element
                 const pageIndex = activeField.page - 1;
@@ -128,7 +148,7 @@ export default function PdfViewer({
                 }
             }
         }
-    }, [assignmentStep, currentAssignmentFieldId, textBoxes]);
+    }, [isFillingMode, currentFillingFieldId, textBoxes]);
 
     useEffect(() => {
         setLoadError(null);
@@ -496,7 +516,12 @@ export default function PdfViewer({
                                             // Assignment Mode Logic
                                             const isAssigning = assignmentStep === 'assigning';
                                             const isCurrentAssignmentField = isAssigning && tb.id === currentAssignmentFieldId;
-                                            const isDimmed = isAssigning && !isCurrentAssignmentField;
+                                            
+                                            // Filling Mode Logic
+                                            const isCurrentFillingField = isFillingMode && tb.id === currentFillingFieldId;
+                                            const isFillingDimmed = isFillingMode && !isCurrentFillingField;
+
+                                            const isDimmed = (isAssigning && !isCurrentAssignmentField) || isFillingDimmed;
                                             
                                             const backgroundColor = isSubmitted ? 'transparent' : (isAssignmentMode || isAssigning ? (tb.recipientId ? "#d4edda" : "#ffe0e0") : "#97c2b566");
                                             const sharedEditable = isSharedDocument
@@ -514,7 +539,7 @@ export default function PdfViewer({
                                                         position: "absolute",
                                                         left,
                                                         top,
-                                                        zIndex: isCurrentAssignmentField ? 100 : 10,
+                                                        zIndex: isCurrentAssignmentField || isCurrentFillingField ? 100 : 10,
                                                         opacity: isDimmed ? 0.3 : 1,
                                                         transition: 'opacity 0.3s ease',
                                                     }}
@@ -544,7 +569,7 @@ export default function PdfViewer({
                                                             cursor: isSubmitted ? "default" : (isAssignmentMode || isAssigning ? "default" : (isLocked ? "not-allowed" : (isSharedDocument ? "pointer" : "move"))),
                                                             userSelect: "none",
                                                             boxSizing: "border-box",
-                                                            boxShadow: isCurrentAssignmentField ? "0 0 0 4px rgba(36, 157, 103, 0.4)" : "none",
+                                                            boxShadow: isCurrentAssignmentField ? "0 0 0 4px rgba(36, 157, 103, 0.4)" : (isCurrentFillingField ? "0 0 0 4px rgba(37, 99, 235, 0.5)" : "none"),
                                                             position: 'relative'
                                                         }}
                                                         onPointerDown={!isAssignmentMode && !isAssigning && !isSharedDocument && !isSubmitted && !isLocked ? (e) => {
@@ -846,23 +871,21 @@ export default function PdfViewer({
                                                                     left: '50%',
                                                                     transform: 'translateX(-50%)',
                                                                     background: 'white',
-                                                                    borderRadius: '8px',
-                                                                    border: '1px solid #249d67',
-                                                                    boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
+                                                                    borderRadius: '8px',                                                                    boxShadow: "0px 4px 12px rgba(0,0,0,0.2)",
                                                                     marginTop: "12px",
                                                                     whiteSpace: "nowrap",
                                                                     zIndex: "1000",
-                                                                    padding: "12px",
+                                                                    padding: "0px",
                                                                     display: "flex",
                                                                     flexDirection: "column",
                                                                     gap: "8px",
-                                                                    minWidth: "200px",
+                                                                    minWidth: "180px",
                                                                 }}
                                                                 onClick={(e) => e.stopPropagation()}
                                                             >
-                                                                <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
+                                                                {/* <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#333' }}>
                                                                     Assign this field
-                                                                </div>
+                                                                </div> */}
                                                                 <select
                                                                     value={tb.recipientId || ""}
                                                                     onChange={(e) => {

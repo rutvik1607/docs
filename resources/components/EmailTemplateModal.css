@@ -14,8 +14,10 @@
 
 .et-modal-content {
     background: white;
-    width: 600px;
-    height: 500px;
+    width: 90%;
+    max-width: 600px;
+    height: auto;
+    max-height: 85vh;
     border-radius: 4px;
     display: flex;
     flex-direction: column;
@@ -227,4 +229,30 @@
 .et-btn.save {
     background: #248567;
     color: white;
+}
+
+@media (max-width: 600px) {
+    .et-modal-content {
+        width: 95%;
+        max-height: 90vh;
+    }
+
+    .et-modal-header {
+        padding: 12px 15px;
+    }
+
+    .et-modal-body {
+        padding: 0 15px 15px 15px;
+    }
+
+    .et-template-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+    }
+
+    .et-template-actions {
+        width: 100%;
+        justify-content: flex-end;
+    }
 }

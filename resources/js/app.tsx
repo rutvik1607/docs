@@ -20,6 +20,8 @@ import axios from "axios";
 import { useParams, useLocation, BrowserRouter } from "react-router-dom";
 import RecipientModal from "../components/Reciepents";
 import SendDocumentModal from "../components/SendDocumentModal";
+import DocumentSendModal from "../components/DocumentSendModel";
+import AllParticipantsCompleteDocModal from "../components/AllParticipantsCompleteDocModal";
 import { attachCertificateToDocument, formatCertificateDate, CertificateData } from "../utils/CertificateGenerator";
 
 // Initialize PDF.js worker
@@ -77,6 +79,8 @@ const App = () => {
     const [assignmentStep, setAssignmentStep] = React.useState<'idle' | 'assigning' | 'review'>('idle');
     const [currentAssignmentFieldId, setCurrentAssignmentFieldId] = React.useState<string | null>(null);
     const [showSendDocumentModal, setShowSendDocumentModal] = useState(false);
+    const [showDocumentSentModal, setShowDocumentSentModal] = useState(false);
+    const [showAllParticipantsCompleteModal, setShowAllParticipantsCompleteModal] = useState(false);
 
     const handleStartAssignment = () => {
         const unassignedFields = textBoxes.filter(tb => !tb.recipientId);
@@ -97,9 +101,6 @@ const App = () => {
         ));
 
         // Find next unassigned field
-        // We need to look at the *updated* state effectively, but since setTextBoxes is async,
-        // we can just look at the current list and exclude the one we just assigned.
-        // Actually, better to find the index of current and look for next.
         const remainingUnassigned = textBoxes.filter(tb => 
             !tb.recipientId && tb.id !== currentAssignmentFieldId
         );
@@ -109,6 +110,86 @@ const App = () => {
         } else {
             setAssignmentStep('review');
             setCurrentAssignmentFieldId(null);
+        }
+    };
+
+    // Recipient Filling Mode Logic
+    const [currentFillingFieldId, setCurrentFillingFieldId] = React.useState<string | null>(null);
+    const [isFillingMode, setIsFillingMode] = React.useState(false);
+    const [showFinishButton, setShowFinishButton] = React.useState(false);
+
+    const isFieldFilled = (tb: TextBox) => {
+        if (tb.isSubmitted) return true;
+        const hasContent = tb.content && tb.content.trim() !== "";
+        const hasImage = Boolean(tb.imageData || (tb.id && localStorage.getItem(`pdf-image-${pdfUrl}-${tb.id}`)));
+        return hasContent || hasImage;
+    };
+
+    const startFilling = () => {
+        if (!editableRecipientFields || editableRecipientFields.length === 0) {
+            toast.info("No fields assigned to you.");
+            return;
+        }
+
+        // Find first unfilled field
+        const firstUnfilled = editableRecipientFields.find(tb => !isFieldFilled(tb));
+        
+        if (firstUnfilled) {
+            setIsFillingMode(true);
+            setCurrentFillingFieldId(firstUnfilled.id);
+            setShowFinishButton(false);
+        } else {
+            // If all filled but not submitted, start review mode (filling mode but showing finish)
+            const allFilled = editableRecipientFields.every(tb => isFieldFilled(tb));
+            if (allFilled && editableRecipientFields.some(tb => !tb.isSubmitted)) {
+                 setIsFillingMode(true);
+                 setCurrentFillingFieldId(editableRecipientFields[0].id); // Go to first field
+                 setShowFinishButton(true);
+                 toast.success("All fields filled! You can review and submit.");
+            } else {
+                toast.info("All fields are already submitted.");
+            }
+        }
+    };
+
+    const nextField = () => {
+        if (!currentFillingFieldId) return;
+
+        // Find index of current field in editable fields
+        const currentIndex = editableRecipientFields.findIndex(tb => tb.id === currentFillingFieldId);
+        
+        // Find next unfilled field after current
+        let nextField = null;
+        for (let i = currentIndex + 1; i < editableRecipientFields.length; i++) {
+            if (!isFieldFilled(editableRecipientFields[i])) {
+                nextField = editableRecipientFields[i];
+                break;
+            }
+        }
+
+        if (nextField) {
+            setCurrentFillingFieldId(nextField.id);
+            setShowFinishButton(false);
+        } else {
+            // No next unfilled field found. Check if ALL fields are filled.
+            const allFilled = editableRecipientFields.every(tb => isFieldFilled(tb));
+            
+            if (allFilled) {
+                setShowFinishButton(true);
+                // Optional: Stay on current field or go to first? 
+                // Let's stay on current, but show Finish button.
+                toast.success("All fields filled! Click Finish to submit.");
+            } else {
+                // Wrap around to find any missed fields
+                const anyUnfilled = editableRecipientFields.find(tb => !isFieldFilled(tb) && tb.id !== currentFillingFieldId);
+                if (anyUnfilled) {
+                     setCurrentFillingFieldId(anyUnfilled.id);
+                     toast.info("Wrapping around to remaining fields.");
+                } else {
+                    // Should be covered by allFilled check, but just in case
+                    setShowFinishButton(true);
+                }
+            }
         }
     };
 
@@ -470,10 +551,25 @@ const App = () => {
     }, [textBoxes, isSharedDocument, activeRecipientId]);
 
     const addTextBox = (box: TextBox) => setTextBoxes((prev) => [...prev, box]);
-    const updateTextBox = (id: string, content: string) =>
+    const updateTextBox = (id: string, content: string) => {
         setTextBoxes((prev) =>
             prev.map((tb) => (tb.id === id ? { ...tb, content } : tb))
         );
+
+        // Auto-advance for date fields if content looks like a date (MM/DD/YYYY)
+        // We need to check the field type, but we only have ID here. 
+        // We can find the field in the current state (textBoxesRef or just look it up)
+        // However, updateTextBox is called on every keystroke for text fields, so we must be careful.
+        // For date fields, the DatePicker calls this with a formatted date string.
+        if (isFillingMode && id === currentFillingFieldId) {
+             const field = textBoxes.find(tb => tb.id === id);
+             if (field && field.fieldType === 'date' && content.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+                 setTimeout(() => {
+                    nextField();
+                 }, 300);
+             }
+        }
+    };
     const moveTextBox = (id: string, x: number, y: number) =>
         setTextBoxes((prev) =>
             prev.map((tb) => (tb.id === id ? { ...tb, x, y } : tb))
@@ -482,10 +578,19 @@ const App = () => {
         setTextBoxes((prev) =>
             prev.map((tb) => (tb.id === id ? { ...tb, width, height } : tb))
         );
-    const updateTextBoxData = (id: string, data: Partial<TextBox>) =>
+    const updateTextBoxData = (id: string, data: Partial<TextBox>) => {
         setTextBoxes((prev) =>
             prev.map((tb) => (tb.id === id ? { ...tb, ...data } : tb))
         );
+        
+        // Auto-advance if filling mode and image data is set (signature/stamp/initials)
+        if (isFillingMode && id === currentFillingFieldId && data.imageData) {
+            // Small delay to allow render update
+            setTimeout(() => {
+                nextField();
+            }, 300);
+        }
+    };
     const removeTextBox = (id: string) =>
         setTextBoxes((prev) => prev.filter((tb) => tb.id !== id));
     const setSelectedTextBoxId = (id: string) => setSelectedTextBoxIdState(id);
@@ -549,6 +654,13 @@ const App = () => {
             return;
         }
 
+        if(handleStartAssignment && assignmentStep === 'idle') {
+            handleStartAssignment();
+            return;
+        }else if(assignmentStep === 'review') {
+            handleCompleteAssignment()
+            return;
+        }
         setIsAssignmentMode(true);
     };
 
@@ -625,9 +737,7 @@ const App = () => {
             const recipientIds = recipients.map((r) => r.id);
             if (recipientIds.length > 0) {
                 await sendShareEmail(recipientIds, 1, 1, subject, body);
-                toast.success(
-                    `PDF saved and emails sent to recipients successfully.`
-                );
+                setShowDocumentSentModal(true);
             } else {
                 toast.success(`PDF and field assignments saved successfully.`);
             }
@@ -705,6 +815,7 @@ const App = () => {
             
             if (response.data && response.data.all_recipients_submitted) {
                 setIsAllRecipientsSubmitted(true);
+                setShowAllParticipantsCompleteModal(true);
             }
             
             const editableIds = new Set(editableRecipientFields.map((tb) => tb.id));
@@ -712,6 +823,10 @@ const App = () => {
                 prev.map((tb) => (editableIds.has(tb.id) ? { ...tb, isSubmitted: true } : tb))
             );
             
+            setIsFillingMode(false);
+            setShowFinishButton(false);
+            setCurrentFillingFieldId(null);
+
             toast.success("Field values saved successfully!");
         } catch (error: any) {
             console.error("Error saving field values:", error);
@@ -944,7 +1059,7 @@ const App = () => {
 
             <div className="main-content">
                 <div className="left-panel">
-                    {isAssignmentMode && assignmentStep === 'idle' && (
+                    {/* {isAssignmentMode && assignmentStep === 'idle' && (
                         <div className="recipient-submit-footer" style={{ borderTop: 'none', borderBottom: '2px solid #248567' }}>
                             <div className="recipient-info">
                                 <span className="recipient-title">Assign Recipients</span>
@@ -966,7 +1081,7 @@ const App = () => {
                                 </button>
                             </div>
                         </div>
-                    )}
+                    )} */}
                     {isSharedDocument && (
                         <div className="recipient-submit-footer">
                             <div className="recipient-info">
@@ -977,13 +1092,58 @@ const App = () => {
                                     {bannerSubtitle}
                                 </span>
                             </div>
-                            {hasPendingFields && (
+                            {/* {hasPendingFields && (
                                 <button
                                     className="recipient-submit-btn"
                                     onClick={handleSubmitRecipientFields}
                                 >
                                     Submit Fields
                                 </button>
+                            )} */}
+                            {isSharedDocument && !isAllRecipientsSubmitted && editableRecipientFields.length > 0 && (
+                                <div className="filling-nav" style={{
+                                    display: 'flex',
+                                    gap: '10px'
+                                }}>
+                                    {!isFillingMode ? (
+                                        <button 
+                                            onClick={startFilling}
+                                            className="recipient-submit-btn"
+                                        >
+                                            Start
+                                        </button>
+                                    ) : (
+                                        <>
+                                            {/* <button 
+                                                onClick={() => {
+                                                    setIsFillingMode(false);
+                                                    setCurrentFillingFieldId(null);
+                                                    setShowFinishButton(false);
+                                                }}
+                                                className="recipient-submit-btn"
+                                                style={{ backgroundColor: 'white', color: '#333', border: '1px solid #ccc' }}
+                                            >
+                                                Stop
+                                            </button> */}
+                                            
+                                            {showFinishButton ? (
+                                                <button 
+                                                    onClick={handleSubmitRecipientFields}
+                                                    className="recipient-submit-btn"
+                                                >
+                                                    Finish
+                                                </button>
+                                            ) : (
+                                                <button 
+                                                    onClick={nextField}
+                                                    className="recipient-submit-btn"
+                                                >
+                                                    Next Field &rarr;
+                                                </button>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             )}
                             {isAllRecipientsSubmitted && (
                                 <button
@@ -996,7 +1156,7 @@ const App = () => {
                             )}
                         </div>
                     )}
-                    {assignmentStep === 'review' && (
+                    {/* {assignmentStep === 'review' && (
                          <div className="recipient-submit-footer" style={{ justifyContent: 'space-between' }}>
                             <div className="recipient-info">
                                 <span className="recipient-title">
@@ -1022,7 +1182,7 @@ const App = () => {
                                 </button>
                             </div>
                         </div>
-                    )}
+                    )} */}
                     {pdfUrl ? (
                         <>
                             <div className="document-canvas">
@@ -1046,6 +1206,8 @@ const App = () => {
                                     assignmentStep={assignmentStep}
                                     currentAssignmentFieldId={currentAssignmentFieldId}
                                     onAssignField={handleAssignField}
+                                    currentFillingFieldId={currentFillingFieldId}
+                                    isFillingMode={isFillingMode}
                                 />
                             </div>
                         </>
@@ -1082,6 +1244,15 @@ const App = () => {
                     fileName={fileName}
                 />
             )}
+            {showDocumentSentModal && (
+                <DocumentSendModal
+                    onClose={() => setShowDocumentSentModal(false)}
+                />
+            )}
+            <AllParticipantsCompleteDocModal
+                isOpen={showAllParticipantsCompleteModal}
+                onClose={() => setShowAllParticipantsCompleteModal(false)}
+            />
         </div>
     );
 };

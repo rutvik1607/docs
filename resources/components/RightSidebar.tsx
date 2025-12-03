@@ -302,22 +302,21 @@ const RightSidebar = forwardRef<RightSidebarHandle, RightSidebarProps>(({
                             </div>
                         )}
                     </div>
-
-                    {/* Download button at the bottom */}
-                    <div className="rs-download-container">
-                        {onSave && (
-                            <button
-                                className="rs-download-btn"
-                                title="Send"
-                                onClick={onSave}
-                            >
-                                <SendIcon height={20} width={20} />
-                                Send
-                            </button>
-                        )}
-                    </div>
                 </>
             )}
+            {/* Download button at the bottom */}
+            <div className="rs-download-container">
+                {onSave && (
+                    <button
+                        className="rs-download-btn"
+                        title="Send"
+                        onClick={onSave}
+                    >
+                        <SendIcon height={20} width={20} />
+                        Send
+                    </button>
+                )}
+            </div>
 
             {/* Add Recipient Modal */}
             {showAddRecipientModal && (
