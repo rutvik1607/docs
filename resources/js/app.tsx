@@ -63,6 +63,7 @@ const App = () => {
         completed_date_time?: string;
         ip_address?: string;
         location?: string;
+        is_fully_submitted?: boolean;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -1025,6 +1026,7 @@ const App = () => {
                             name: `${r.first_name} ${r.last_name}`,
                             email: r.email,
                             status: r.share_status ?? 0,
+                            isFullySubmitted: r.is_fully_submitted ?? false,
                             sentAt: r.send_date_time ? formatCertificateDate(r.send_date_time) : undefined,
                             viewedAt: r.view_date_time ? formatCertificateDate(r.view_date_time) : undefined,
                             signedAt: r.completed_date_time ? formatCertificateDate(r.completed_date_time) : undefined,

@@ -14,10 +14,11 @@ import { PDFDocument, rgb } from 'pdf-lib';
 export interface CertificateRecipient {
     name: string;
     email: string;
-    status?: number; // 0=Send, 1=View, 2=Completed, 3=Cancel
+    status?: number; // 0=Send, 1=View, 2=Completed (all recipients done), 3=Cancel
+    isFullySubmitted?: boolean; // Has this recipient submitted all their fields?
     sentAt?: string;
     viewedAt?: string;
-    signedAt?: string;
+    signedAt?: string; // When this recipient completed their part
     signature?: string;
     ipAddress?: string;
     location?: string;
@@ -134,9 +135,15 @@ function populateCertificateData(templateHtml: string, data: CertificateData): s
                                     <div style="font-size: 10px;">${recipient.viewedAt || 'N/A'}</div>
                                 </div>
                             ` : ''}
+                            ${recipient.isFullySubmitted ? `
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">SIGNED</div>
+                                    <div style="font-size: 10px;">${recipient.signedAt || 'N/A'}</div>
+                                </div>
+                            ` : ''}
                             ${(recipient.status ?? 0) >= 2 ? `
                                 <div style="margin-bottom: 10px;">
-                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">Completed</div>
+                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">COMPLETED</div>
                                     <div style="font-size: 10px;">${recipient.signedAt || 'N/A'}</div>
                                 </div>
                             ` : ''}
