@@ -57,6 +57,12 @@ const App = () => {
         first_name: string;
         last_name: string;
         email: string;
+        share_status?: number;
+        send_date_time?: string;
+        view_date_time?: string;
+        completed_date_time?: string;
+        ip_address?: string;
+        location?: string;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -1018,24 +1024,21 @@ const App = () => {
                         recipientMap.set(r.id, {
                             name: `${r.first_name} ${r.last_name}`,
                             email: r.email,
-                            signedAt: formatCertificateDate(new Date()),
-                            signature: undefined
+                            status: r.share_status ?? 0,
+                            sentAt: r.send_date_time ? formatCertificateDate(r.send_date_time) : undefined,
+                            viewedAt: r.view_date_time ? formatCertificateDate(r.view_date_time) : undefined,
+                            signedAt: r.completed_date_time ? formatCertificateDate(r.completed_date_time) : undefined,
+                            signature: undefined,
+                            ipAddress: r.ip_address,
+                            location: r.location
                         });
                     });
 
-                    // Update with actual signature data and IP/Location from submitted fields
+                    // Update with actual signature data from submitted fields
                     submittedFields.forEach(field => {
                         if (field.recipientId && recipientMap.has(field.recipientId)) {
                             const recipient = recipientMap.get(field.recipientId);
                             console.log(recipient,"recipient")
-                            
-                            // Update IP and Location if available (take from the first field that has it)
-                            if (field.ipAddress && !recipient.ipAddress) {
-                                recipient.ipAddress = field.ipAddress;
-                            }
-                            if (field.location && !recipient.location) {
-                                recipient.location = field.location;
-                            }
 
                             if (field.fieldType === 'signature' && !recipient.signature) {
                                 const imageData = getFieldImageData(field);

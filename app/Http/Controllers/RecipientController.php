@@ -349,6 +349,12 @@ class RecipientController extends Controller
                     'share_recipients.token',
                     'share_recipients.field_json',
                     'share_recipients.date',
+                    'share_recipients.status as share_status',
+                    'share_recipients.send_date_time',
+                    'share_recipients.view_date_time',
+                    'share_recipients.completed_date_time',
+                    'share_recipients.ip_address',
+                    'share_recipients.location',
                     'share_recipients.created_at as share_created_at',
                     'share_recipients.updated_at as share_updated_at'
                 )
@@ -391,6 +397,12 @@ class RecipientController extends Controller
                         'updated_at' => $item->recipient_updated_at,
                         'template_id' => $item->template_id,
                         'share_recipient_id' => $item->share_recipient_id,
+                        'share_status' => $item->share_status,
+                        'send_date_time' => $item->send_date_time,
+                        'view_date_time' => $item->view_date_time,
+                        'completed_date_time' => $item->completed_date_time,
+                        'ip_address' => $item->ip_address,
+                        'location' => $item->location,
                         'token' => $item->token,
                         'link' => $item->token ? route('shared.document.link', $item->token) : null,
                         'assigned_at' => $item->share_created_at,
@@ -1019,7 +1031,6 @@ class RecipientController extends Controller
                         ->where('recipient_id', $rec->id)
                         ->update([
                             'token' => $token,
-                            'link' => $secureLink,
                             'status' => 0,
                             'send_date_time' => now(),
                             'updated_at' => now()

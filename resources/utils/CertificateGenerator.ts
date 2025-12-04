@@ -14,7 +14,10 @@ import { PDFDocument, rgb } from 'pdf-lib';
 export interface CertificateRecipient {
     name: string;
     email: string;
-    signedAt: string;
+    status?: number; // 0=Send, 1=View, 2=Completed, 3=Cancel
+    sentAt?: string;
+    viewedAt?: string;
+    signedAt?: string;
     signature?: string;
     ipAddress?: string;
     location?: string;
@@ -113,18 +116,31 @@ function populateCertificateData(templateHtml: string, data: CertificateData): s
                     
                     <!-- Column 2: Timestamps -->
                     <div style="text-align: start;">
-                        <div style="margin-bottom: 10px;">
-                            <div style="font-size: 9px; color: #999; margin-bottom: 2px;">SENT</div>
-                            <div style="font-size: 10px;">${recipient.signedAt}</div>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <div style="font-size: 9px; color: #999; margin-bottom: 2px;">VIEWED</div>
-                            <div style="font-size: 10px;">${recipient.signedAt}</div>
-                        </div>
-                        <div style="margin-bottom: 10px;">
-                            <div style="font-size: 9px; color: #999; margin-bottom: 2px;">SIGNED</div>
-                            <div style="font-size: 10px;">${recipient.signedAt}</div>
-                        </div>
+                        ${(recipient.status ?? 0) === 3 ? `
+                            <div style="margin-bottom: 10px;">
+                                <div style="font-size: 9px; color: #999; margin-bottom: 2px;">STATUS</div>
+                                <div style="font-size: 10px; color: #d9534f; font-weight: bold;">CANCELLED</div>
+                            </div>
+                        ` : `
+                            ${(recipient.status ?? 0) >= 0 ? `
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">SENT</div>
+                                    <div style="font-size: 10px;">${recipient.sentAt || 'N/A'}</div>
+                                </div>
+                            ` : ''}
+                            ${(recipient.status ?? 0) >= 1 ? `
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">VIEW</div>
+                                    <div style="font-size: 10px;">${recipient.viewedAt || 'N/A'}</div>
+                                </div>
+                            ` : ''}
+                            ${(recipient.status ?? 0) >= 2 ? `
+                                <div style="margin-bottom: 10px;">
+                                    <div style="font-size: 9px; color: #999; margin-bottom: 2px;">Completed</div>
+                                    <div style="font-size: 10px;">${recipient.signedAt || 'N/A'}</div>
+                                </div>
+                            ` : ''}
+                        `}
                     </div>
                     
                     <!-- Column 3: Signature -->
