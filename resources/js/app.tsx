@@ -1036,16 +1036,25 @@ const App = () => {
                         });
                     });
 
-                    // Update with actual signature data from submitted fields
+                    // Update with actual signature and initial data from submitted fields
                     submittedFields.forEach(field => {
                         if (field.recipientId && recipientMap.has(field.recipientId)) {
                             const recipient = recipientMap.get(field.recipientId);
                             console.log(recipient,"recipient")
 
+                            // Collect signature data
                             if (field.fieldType === 'signature' && !recipient.signature) {
                                 const imageData = getFieldImageData(field);
                                 if (imageData) {
                                     recipient.signature = imageData;
+                                }
+                            }
+                            
+                            // Collect initial data as fallback
+                            if (field.fieldType === 'initials' && !recipient.initial) {
+                                const imageData = getFieldImageData(field);
+                                if (imageData) {
+                                    recipient.initial = imageData;
                                 }
                             }
                         }

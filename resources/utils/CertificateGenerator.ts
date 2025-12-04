@@ -20,6 +20,7 @@ export interface CertificateRecipient {
     viewedAt?: string;
     signedAt?: string; // When this recipient completed their part
     signature?: string;
+    initial?: string; // Fallback if signature is not available
     ipAddress?: string;
     location?: string;
 }
@@ -155,6 +156,8 @@ function populateCertificateData(templateHtml: string, data: CertificateData): s
                         <div style="border: 1px solid #000; padding: 10px; min-height: 40px; display: flex; align-items: center; justify-content: center; background: white;">
                             ${recipient.signature ? `
                                 <img src="${recipient.signature}" style="max-width: 100%; max-height: 70px;" alt="Signature" />
+                            ` : recipient.initial ? `
+                                <img src="${recipient.initial}" style="max-width: 100%; max-height: 70px;" alt="Initial" />
                             ` : `
                                 <div style="color: #ccc; font-size: 12px;">No signature</div>
                             `}
