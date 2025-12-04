@@ -440,6 +440,8 @@ class RecipientController extends Controller
                 return "Invalid or expired link";
             }
 
+            DB::table('share_recipients')->where('id', $shareRecipient->id)->update(['status' => 1, 'view_date_time' => now()]);
+            
             // Validate recipient still exists
             $recipient = DB::table('recipients')
                 ->where('id', $shareRecipient->recipient_id)
@@ -625,9 +627,12 @@ class RecipientController extends Controller
                     // Update IP Address and Location
                     if (isset($matchingField['ipAddress'])) {
                         $existingField['ipAddress'] = $matchingField['ipAddress'];
+
+                        $ipAddress = $matchingField['ipAddress'];
                     }
                     if (isset($matchingField['location'])) {
                         $existingField['location'] = $matchingField['location'];
+                        $location = $matchingField['location'];
                     }
                 }
                 $updatedFields[] = $existingField;
@@ -637,6 +642,10 @@ class RecipientController extends Controller
             DB::table('share_recipients')
                 ->where('token', $token)
                 ->update([
+                    'status' => 2,
+                    'completed_date_time' => now(),
+                    'ip_address' => $ipAddress,
+                    'location' => $location,
                     'field_json' => json_encode($updatedFields),
                     'updated_at' => now(),
                 ]);
@@ -1010,6 +1019,9 @@ class RecipientController extends Controller
                         ->where('recipient_id', $rec->id)
                         ->update([
                             'token' => $token,
+                            'link' => $secureLink,
+                            'status' => 0,
+                            'send_date_time' => now(),
                             'updated_at' => now()
                         ]);
                 } else {

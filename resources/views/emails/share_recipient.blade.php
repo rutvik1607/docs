@@ -129,12 +129,6 @@
     <div class="buttons">
       <a href="{{ $link }}" class="btn open-btn">Open the Document</a>
     </div>
-    <div class="report">
-      <svg width="15" height="15" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-        <path d="M11 15h2v2h-2zM11 7h2v6h-2zM1 21h22L12 2 1 21z"></path>
-      </svg>
-      <a href="#" style="color: #999; text-decoration:none;">Report spam</a>
-    </div>
     <div class="footer">
       Use DocuCrafter to create, send, track, and eSign documents — quickly and securely.
     </div>
