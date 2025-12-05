@@ -5,33 +5,22 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>{{ $sender->name ?? 'Someone' }} sent you {{ $documentName ?? 'Document' }} via DocuCrafter</title>
 <style>
-  body {
-    margin: 0;
-    background-color: #d9d9d9;
-    font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    padding: 40px 20px;
-  }
   .container {
-    background-color: #fff;
+    background-color: rgb(229, 229, 229);
     padding: 20px 40px 30px;
-    max-width: 500px;
     box-sizing: border-box;
     text-align: center !important;
+    display: block;
+    justify-content: center;
+    align-items: center;
   }
   .logo {
     display: block;
     margin: 0 auto 20px;
   }
   .message-box {
-    border-top: 1px solid #ddd;
-    border-bottom: 1px solid #ddd;
-    padding: 15px 0;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
+    background: white;
+    padding: 2rem;
   }
   .avatar {
     width: 45px;
@@ -48,7 +37,6 @@
     font-size: 14px;
     color: #333;
     text-align: left;
-    margin-left: 10px !important;
   }
   .message-text b {
     font-weight: 700;
@@ -94,7 +82,7 @@
   }
   .footer {
     font-size: 12px;
-    color: #999;
+    color: #767676;
     margin-top: 25px;
     text-align: center;
   }
@@ -115,23 +103,31 @@
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="message-box">
-      <div class="avatar" aria-label="Profile Icon">&#128100;</div>
-      <div class="message-text">
-        @if(!empty($customBody))
-            {!! nl2br(e($customBody)) !!}
-        @else
-            <b>{{ $sender->name ?? 'Someone' }}</b> sent you <b>{{ $documentName ?? 'Document' }}.</b>
-        @endif
-      </div>
+  <div class="container" style="justify-content: center;">
+  <div style="width: 500px; display: inline-block;">
+    <div style="text-align: center; padding: 16px 0 16px 0;">
+      <img src="{{ $message->embed(public_path('logo.png')) }}" style="object-fit: contain; width: 100px;">
     </div>
-    <div class="buttons">
-      <a href="{{ $link }}" class="btn open-btn">Open the Document</a>
+    <div class="message-box">
+      <div style="display: flex; gap: 1rem; ">
+        <img style="margin: 0 20px 0 0;" src="https://ci3.googleusercontent.com/meips/ADKq_NY2LUHGL3wmmPENsc4iv9xmslLnl0gPMWX5B2mGvBWK0fu42WwrnU_M5glSKE25p7L7srzQSiG8Z_EPCInuQYSgwx6nWp7wDTJjR0fEeJOwG2kIlGiUL_QnOSR0hA=s0-d-e1-ft#https://api.pandadoc.com/avatar/?q=maulik.makadiya0411%40gmail.com&amp;s=40" alt="" width="50" height="50" class="CToWUd" data-bit="iit">
+        <div class="message-text">
+          @if(!empty($customBody))
+              <p style="font-family:'Helvetica Neue','Helvetica',Arial,sans-serif;font-size:15px;color:#333b40;margin:0;padding:0;border-collapse:collapse;line-height:22px!important"> {!! nl2br(e($customBody)) !!}</p>
+          @else
+              <p style="font-family:'Helvetica Neue','Helvetica',Arial,sans-serif;font-size:15px;color:#333b40;margin:0;padding:0;border-collapse:collapse;line-height:22px!important"><b>{{ $sender->name ?? 'Someone' }}</b> sent you <b>{{ $documentName ?? 'Document' }}.</b></p>
+          @endif
+        </div>
+      </div>
+      <div style="margin: 16px 0 16px 0; height: 1px; background: #eaeaea;"></div>
+      <div class="buttons" style="display: block;">
+        <a style="display: inline-block;" href="{{ $link }}" class="btn open-btn">Open the Document</a>
+      </div>
     </div>
     <div class="footer">
       Use DocuCrafter to create, send, track, and eSign documents — quickly and securely.
     </div>
+  </div>
   </div>
 </body>
 </html>

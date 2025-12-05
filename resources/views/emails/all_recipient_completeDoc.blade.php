@@ -3,35 +3,24 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>{{ $documentName ?? 'Document' }} document has been completed by all participants</title>
+<title>{{ $documentName ?? '' }} document has been completed by all participants via DocuCrafter</title>
 <style>
-  body {
-    margin: 0;
-    background-color: #d9d9d9;
-    font-family: Arial, sans-serif;
-    display: flex;
-    justify-content: center;
-    padding: 40px 20px;
-  }
   .container {
-    background-color: #fff;
+    background-color: rgb(229, 229, 229);
     padding: 20px 40px 30px;
-    max-width: 500px;
     box-sizing: border-box;
     text-align: center !important;
+    display: block;
+    justify-content: center;
+    align-items: center;
   }
   .logo {
     display: block;
     margin: 0 auto 20px;
   }
   .message-box {
-    border-top: 1px solid #ddd;
-    border-bottom: 1px solid #ddd;
-    padding: 15px 0;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
+    background: white;
+    padding: 2rem;
   }
   .avatar {
     width: 45px;
@@ -48,7 +37,6 @@
     font-size: 14px;
     color: #333;
     text-align: left;
-    margin-left: 10px !important;
   }
   .message-text b {
     font-weight: 700;
@@ -94,7 +82,7 @@
   }
   .footer {
     font-size: 12px;
-    color: #999;
+    color: #767676;
     margin-top: 25px;
     text-align: center;
   }
@@ -115,19 +103,26 @@
 </style>
 </head>
 <body>
-  <div class="container">
-    <div class="message-box">
-      <div class="avatar" aria-label="Profile Icon">&#128100;</div>
-      <div class="message-text">
-        <b>{{ $documentName ?? 'Document' }} document has been completed by all participants</b>
-      </div>
+  <div class="container" style="justify-content: center;">
+  <div style="width: 500px; display: inline-block;">
+    <div style="text-align: center; padding: 16px 0 16px 0;">
+      <img src="{{ $message->embed(public_path('logo.png')) }}" style="object-fit: contain; width: 100px;">
     </div>
-    <div class="buttons">
-      <a href="{{ $link }}" class="btn open-btn">Open The Document</a>
+    <div class="message-box">
+      <div style="display: flex; gap: 1rem; ">
+        <div class="message-text">
+          <p style="font-family:'Helvetica Neue','Helvetica',Arial,sans-serif;font-size:15px;color:#333b40;margin:0;padding:0;border-collapse:collapse;line-height:22px!important"><b>{{ $documentName ?? 'Document' }}</b> document has been completed by all participants</p>
+        </div>
+      </div>
+      <div style="margin: 16px 0 16px 0; height: 1px; background: #eaeaea;"></div>
+      <div class="buttons" style="display: block;">
+        <a style="display: inline-block;" href="{{ $downloadLink }}" class="btn open-btn">Download The Document</a>
+      </div>
     </div>
     <div class="footer">
       Use DocuCrafter to create, send, track, and eSign documents — quickly and securely.
     </div>
+  </div>
   </div>
 </body>
 </html>

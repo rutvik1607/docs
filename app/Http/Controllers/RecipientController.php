@@ -7,8 +7,10 @@ use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Storage;
 use App\Mail\ShareRecipientMail;
 use App\Mail\DocumentComplateMail;
+use League\Flysystem\AwsS3V3\PortableVisibilityConverter;
 use Carbon\Carbon;
 use Exception;
 use DB;
@@ -695,6 +697,28 @@ class RecipientController extends Controller
                 }
             }
 
+            if ($allRecipientsSubmitted) {
+                
+                $share_recipients = DB::table('share_recipients')
+                                        ->where('template_id', $shareRecipient->template_id)
+                                        ->pluck('recipient_id')
+                                        ->toArray();
+
+                $recipients = DB::table('recipients')
+                                        ->whereIn('id', $share_recipients)
+                                        ->get();
+
+                if (!empty($recipients)) {
+
+                    $documentName = '#';
+
+                    foreach ($recipients as $key => $recipient) {
+                        $finalDocumentDownloadLink = '#';
+                        Mail::to($recipient->email)->send(new DocumentComplateMail($finalDocumentDownloadLink, $documentName));
+                    }
+                }
+            }
+
             return response()->json([
                 'status'       => true,
                 'success_code' => 2000,
@@ -1194,5 +1218,68 @@ class RecipientController extends Controller
                 'error'       => $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function finalDocument(Request $request)
+    {
+        if ($request->hasFile('file')) {
+
+            $shareRecipient = DB::table('share_recipients')
+                                ->where('token', $request->shared_token)
+                                ->first();
+
+            if ($shareRecipient) {
+
+                $file = $request->file('file');
+                $fileName = $file->getClientOriginalName();
+                $extension = $file->getClientOriginalExtension();
+                $uniqueName = uniqid('doc_', true) . '.' . $extension;
+                $path = "upload/final_documents/" . $uniqueName;
+
+                // Upload securely to S3
+                Storage::disk('s3')->put($path, file_get_contents($file), [
+                    'visibility' => 'private',  // or 'public' if you want public download
+                    'ContentType' => $file->getMimeType(),
+                ]);
+
+                // Save fileName OR full S3 path in DB
+                DB::table('share_recipients')
+                    ->where('template_id', $shareRecipient->template_id)
+                    ->update([
+                        'final_document' => $uniqueName,
+                    ]);
+
+                // Public S3 URL return
+                $downloadUrl = Storage::disk('s3')->url($path);
+
+                return response()->json([
+                    'message' => 'File uploaded successfully',
+                    'file_path' => $path,
+                    'download_url' => $downloadUrl,   // ← S3 public URL
+                ]);
+            }
+
+        }
+
+        return response()->json(['message' => 'No file uploaded'], 400);
+    }
+
+    public function downloadFinalDocument($filename)
+    {
+        $path = "upload/final_documents/" . $filename;
+
+        if (!Storage::disk('s3')->exists($path)) {
+            abort(404, "File not found");
+        }
+
+        // 🔐 Generate Secure Temporary URL (expires in 10 minutes)
+        $tempUrl = Storage::disk('s3')->temporaryUrl(
+            $path,
+            now()->addMinutes(10)
+        );
+
+        return response()->json([
+            'download_url' => $tempUrl
+        ]);
     }
 }

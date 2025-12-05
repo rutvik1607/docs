@@ -8,3 +8,4 @@ Route::get('/', function () {
 });
 
 Route::get('document/{link}', [RecipientController::class, 'openDocument'])->name('shared.document.link');
+Route::get('download/final-document/{filename}', [RecipientController::class, 'downloadFinalDocument'])->name('download.final.document');

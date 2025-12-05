@@ -13,15 +13,15 @@ class DocumentComplateMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public $link;
+    public $downloadLink;
     public $documentName;
 
     /**
      * Create a new message instance.
      */
-    public function __construct($link, $documentName = 'Document')
+    public function __construct($downloadLink, $documentName = 'Document')
     {
-        $this->link = $link;
+        $this->downloadLink = $downloadLink;
         $this->documentName = $documentName;
     }
 
@@ -32,7 +32,7 @@ class DocumentComplateMail extends Mailable
         return $this->subject($subject)
             ->view('emails.all_recipient_completeDoc')
             ->with([
-                'link' => $this->link,
+                'downloadLink' => $this->downloadLink,
                 'documentName' => $this->documentName,
             ]);
     }

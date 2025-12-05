@@ -14,7 +14,7 @@
 .sd-modal-content {
     background: #f9f9f9;
     width: 1000px;
-    height: 700px;
+    height: 95vh;
     border-radius: 4px;
     display: flex;
     flex-direction: column;

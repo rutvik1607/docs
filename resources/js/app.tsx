@@ -99,7 +99,6 @@ const App = () => {
             setAssignmentStep('review');
             return;
         }
-        console.log()
         setAssignmentStep('assigning');
         setCurrentAssignmentFieldId(unassignedFields[0].id);
     };
@@ -1069,6 +1068,23 @@ const App = () => {
             const blob = new Blob([pdfBytes as BlobPart], {
                 type: "application/pdf",
             });
+
+            const formData = new FormData();
+            formData.append("file", blob, fileName);
+            formData.append("shared_token", sharedToken);
+
+            fetch("/api/store-final-document", {
+              method: "POST",
+              body: formData,
+            })
+              .then((res) => res.json())
+              .then((data) => {
+                // console.log("File saved successfully:", data);
+              })
+              .catch((err) => {
+                console.error("Upload failed:", err);
+              });
+            
             const link = document.createElement("a");
             link.href = URL.createObjectURL(blob);
             link.download = fileName.replace(".pdf", "_submitted.pdf");
