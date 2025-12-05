@@ -63,6 +63,7 @@ const App = () => {
         completed_date_time?: string;
         ip_address?: string;
         location?: string;
+        is_fully_submitted?: boolean;
     }
 
     const [textBoxes, setTextBoxes] = React.useState<TextBox[]>([]);
@@ -1024,6 +1025,7 @@ const App = () => {
                             name: `${r.first_name} ${r.last_name}`,
                             email: r.email,
                             status: r.share_status ?? 0,
+                            isFullySubmitted: r.is_fully_submitted ?? false,
                             sentAt: r.send_date_time ? formatCertificateDate(r.send_date_time) : undefined,
                             viewedAt: r.view_date_time ? formatCertificateDate(r.view_date_time) : undefined,
                             signedAt: r.completed_date_time ? formatCertificateDate(r.completed_date_time) : undefined,
@@ -1033,16 +1035,25 @@ const App = () => {
                         });
                     });
 
-                    // Update with actual signature data from submitted fields
+                    // Update with actual signature and initial data from submitted fields
                     submittedFields.forEach(field => {
                         if (field.recipientId && recipientMap.has(field.recipientId)) {
                             const recipient = recipientMap.get(field.recipientId);
                             console.log(recipient,"recipient")
 
+                            // Collect signature data
                             if (field.fieldType === 'signature' && !recipient.signature) {
                                 const imageData = getFieldImageData(field);
                                 if (imageData) {
                                     recipient.signature = imageData;
+                                }
+                            }
+                            
+                            // Collect initial data as fallback
+                            if (field.fieldType === 'initials' && !recipient.initial) {
+                                const imageData = getFieldImageData(field);
+                                if (imageData) {
+                                    recipient.initial = imageData;
                                 }
                             }
                         }
